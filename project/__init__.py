@@ -11,7 +11,7 @@ def create_app():
     # Конфигурация из переменных окружения
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
     app.config["CACHE_TYPE"] = "RedisCache"
-    app.config["CACHE_REDIS_URL"] = os.getenv("CACHE_REDIS_URL") # Мы добавим это на Render
+    app.config["CACHE_REDIS_URL"] = os.getenv("CACHE_REDIS_URL")
     app.config["CACHE_DEFAULT_TIMEOUT"] = 300 # 5 минут
 
     # Инициализация расширений
@@ -20,7 +20,9 @@ def create_app():
     # Регистрация Blueprints
     from .main.routes import main_bp
     from .gallery.routes import gallery_bp
+    from .api.routes import api_bp  # <--- ДОБАВЛЕНО
     app.register_blueprint(main_bp)
     app.register_blueprint(gallery_bp)
+    app.register_blueprint(api_bp)    # <--- ДОБАВЛЕНО
 
     return app

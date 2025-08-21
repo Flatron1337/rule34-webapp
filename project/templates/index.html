@@ -1,3 +1,4 @@
+<!-- project/templates/index.html -->
 {% extends "base.html" %}
 {% block title %}Поиск по Rule34{% endblock %}
 
@@ -9,7 +10,8 @@
                 <h1 class="card-title mb-4">Поиск по Rule34</h1>
                 <form action="{{ url_for('gallery.show_gallery') }}" method="get">
                     <div class="mb-3">
-                        <input type="text" class="form-control form-control-lg" name="tags" placeholder="например, genshin_impact raidenshogun" required>
+                        <!-- Добавлен класс awesomplete и id="tags-input" -->
+                        <input type="text" class="form-control form-control-lg awesomplete" id="tags-input" name="tags" placeholder="например, genshin_impact raidenshogun" required>
                     </div>
                     <div class="mb-4">
                         <input type="text" class="form-control" name="blacklist" placeholder="Персональный черный список (через пробел)">
@@ -33,4 +35,36 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const input = document.getElementById("tags-input");
+    const awesomplete = new Awesomplete(input, {
+        minChars: 2, // Начинать поиск после ввода 2 символов
+        list: []     // Изначально список пуст
+    });
+
+    input.addEventListener("input", async function() {
+        // Получаем последнее слово из строки ввода
+        const parts = this.value.split(" ");
+        const currentTag = parts[parts.length - 1];
+
+        if (currentTag.length < awesomplete.minChars) {
+            return;
+        }
+
+        // Отправляем запрос на наш API
+        try {
+            const response = await fetch(`/api/autocomplete?q=${encodeURIComponent(currentTag)}`);
+            const suggestions = await response.json();
+            // Обновляем список подсказок в библиотеке
+            awesomplete.list = suggestions;
+        } catch (error) {
+            console.error("Autocomplete error:", error);
+        }
+    });
+});
+</script>
 {% endblock %}

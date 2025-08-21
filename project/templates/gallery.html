@@ -1,3 +1,4 @@
+<!-- project/templates/gallery.html -->
 {% extends "base.html" %}
 {% block title %}Результаты для: {{ tags }}{% endblock %}
 
@@ -20,12 +21,23 @@
     {% for post in posts %}
     <div class="col">
         <div class="card h-100 bg-dark text-white">
-            <img src="{{ post.file_url if post.file_url.endswith(('jpg', 'jpeg', 'png', 'gif')) else 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7' }}" 
-                 data-media-url="{{ post.file_url }}" 
-                 class="card-img-top post-media" 
-                 alt="Post media" 
-                 loading="lazy" 
-                 onclick="openLightbox(this)">
+            
+            <!-- ИЗМЕНЕНИЕ ЗДЕСЬ -->
+            {% if post.file_url.endswith(('mp4', 'webm')) %}
+                <!-- Для видео используем тег VIDEO с poster'ом -->
+                <video controls muted loop class="card-img-top post-media" preload="metadata" loading="lazy" poster="{{ post.preview_url }}" onclick="openLightbox(this)" data-media-url="{{ post.file_url }}">
+                    <source src="{{ post.file_url }}">
+                </video>
+            {% else %}
+                <!-- Для изображений используем тег IMG -->
+                <img src="{{ post.file_url }}" 
+                     data-media-url="{{ post.file_url }}" 
+                     class="card-img-top post-media" 
+                     alt="Post media" 
+                     loading="lazy" 
+                     onclick="openLightbox(this)">
+            {% endif %}
+
             <div class="card-body text-center">
                 <p class="card-text mb-2">
                     Рейтинг: {{ post.score }} | <a href="{{ post_url_base }}{{ post.id }}" target="_blank">Источник</a>

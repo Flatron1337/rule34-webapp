@@ -4,4 +4,4 @@ httpx
 python-dotenv
 hypercorn
 redis
-Flask-Caching[redis]  # Более удобная обертка для кэширования в Flask
+flask-caching[redis]  # <--- ИСПРАВЛЕНО

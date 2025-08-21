@@ -4,4 +4,4 @@ httpx
 python-dotenv
 hypercorn
 redis
-flask-caching[redis]>=2.1.0  # <--- ИСПРАВЛЕНО
+flask-caching>=2.1.0

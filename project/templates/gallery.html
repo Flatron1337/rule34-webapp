@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Результаты для: {{ tags }}{% endblock %}
+
+{% block content %}
+<div class="text-center mb-4">
+    <h1>Результаты по запросу: <span class="text-info">{{ tags or "Случайные посты" }}</span></h1>
+    <a href="{{ url_for('main.index') }}" class="btn btn-secondary">Новый поиск</a>
+</div>
+
+<div class="controls d-flex justify-content-center align-items-center gap-3 mb-4">
+    <span>Сортировка:</span>
+    <div class="btn-group">
+        <a href="{{ url_for('gallery.show_gallery', tags=tags, blacklist=user_blacklist, page=0, sort='score') }}" class="btn btn-outline-primary {% if sort_mode == 'score' %}active{% endif %}">🌟 Рейтинг</a>
+        <a href="{{ url_for('gallery.show_gallery', tags=tags, blacklist=user_blacklist, page=0, sort='date') }}" class="btn btn-outline-primary {% if sort_mode == 'date' %}active{% endif %}">📅 Дата</a>
+    </div>
+</div>
+
+{% if posts %}
+<div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
+    {% for post in posts %}
+    <div class="col">
+        <div class="card h-100 bg-dark text-white">
+            <img src="{{ post.file_url if post.file_url.endswith(('jpg', 'jpeg', 'png', 'gif')) else 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7' }}" 
+                 data-media-url="{{ post.file_url }}" 
+                 class="card-img-top post-media" 
+                 alt="Post media" 
+                 loading="lazy" 
+                 onclick="openLightbox(this)">
+            <div class="card-body text-center">
+                <p class="card-text mb-2">
+                    Рейтинг: {{ post.score }} | <a href="{{ post_url_base }}{{ post.id }}" target="_blank">Источник</a>
+                </p>
+                <a href="{{ post.file_url }}" class="btn btn-sm btn-success" download>Скачать</a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Пагинация -->
+<nav class="mt-5 d-flex justify-content-center">
+    <ul class="pagination">
+        {% if page > 0 %}
+        <li class="page-item"><a class="page-link" href="{{ url_for('gallery.show_gallery', tags=tags, blacklist=user_blacklist, page=page-1, sort=sort_mode) }}">Назад</a></li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link">Назад</span></li>
+        {% endif %}
+
+        {% for p in page_range %}
+        {% if p >= 0 %}
+        <li class="page-item {% if p == page %}active{% endif %}"><a class="page-link" href="{{ url_for('gallery.show_gallery', tags=tags, blacklist=user_blacklist, page=p, sort=sort_mode) }}">{{ p + 1 }}</a></li>
+        {% endif %}
+        {% endfor %}
+
+        {% if posts|length == limit %}
+        <li class="page-item"><a class="page-link" href="{{ url_for('gallery.show_gallery', tags=tags, blacklist=user_blacklist, page=page+1, sort=sort_mode) }}">Вперед</a></li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link">Вперед</span></li>
+        {% endif %}
+    </ul>
+</nav>
+{% else %}
+<div class="alert alert-warning text-center" role="alert">
+    <h2>По вашему запросу ничего не найдено.</h2>
+</div>
+{% endif %}
+
+<!-- Модальное окно для Lightbox -->
+<div class="modal fade" id="lightboxModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content bg-transparent border-0">
+      <div class="modal-body p-0 text-center">
+        <!-- Контент будет вставлен сюда через JS -->
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openLightbox(element) {
+    const mediaUrl = element.getAttribute('data-media-url');
+    const modalBody = document.querySelector('#lightboxModal .modal-body');
+    
+    if (mediaUrl.endsWith('.mp4') || mediaUrl.endsWith('.webm')) {
+        modalBody.innerHTML = `<video controls autoplay src="${mediaUrl}" class="img-fluid"></video>`;
+    } else {
+        modalBody.innerHTML = `<img src="${mediaUrl}" class="img-fluid">`;
+    }
+    
+    const lightboxModal = new bootstrap.Modal(document.getElementById('lightboxModal'));
+    lightboxModal.show();
+}
+</script>
+{% endblock %}

@@ -3,4 +3,5 @@ flask[async]
 httpx
 python-dotenv
 hypercorn
-cachetools
+redis
+Flask-Caching[redis]  # Более удобная обертка для кэширования в Flask

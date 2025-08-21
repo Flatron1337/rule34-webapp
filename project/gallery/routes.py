@@ -1,13 +1,14 @@
 # project/gallery/routes.py
 from flask import Blueprint, render_template, request, session, redirect, url_for
-from .api import fetch_posts
+from .api import fetch_posts # Импортируем нашу новую синхронную функцию
 
 gallery_bp = Blueprint('gallery', __name__)
 POST_URL_BASE = "https://rule34.xxx/index.php?page=post&s=view&id="
 GALLERY_LIMIT = 20
 
+# УБИРАЕМ 'async' ОТСЮДА
 @gallery_bp.route('/gallery')
-async def show_gallery():
+def show_gallery():
     """Основной маршрут для отображения результатов поиска."""
     query_tags = request.args.get('tags', '').strip()
     user_blacklist_str = request.args.get('blacklist', '').strip()
@@ -26,7 +27,8 @@ async def show_gallery():
     tags_tuple = tuple(query_tags.split()) if query_tags else tuple()
     user_blacklist_tuple = tuple(user_blacklist_str.split()) if user_blacklist_str else tuple()
     
-    posts = await fetch_posts(tags_tuple, page, sort_mode, user_blacklist_tuple, GALLERY_LIMIT)
+    # УБИРАЕМ 'await' ОТСЮДА
+    posts = fetch_posts(tags_tuple, page, sort_mode, user_blacklist_tuple, GALLERY_LIMIT)
     
     page_range = range(max(0, page - 2), page + 3)
 

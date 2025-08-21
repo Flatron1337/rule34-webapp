@@ -2,41 +2,45 @@
 import os
 import httpx
 import logging
-import asyncio # Импортируем asyncio для запуска async кода из sync
+import asyncio
+from json.decoder import JSONDecodeError
 from project.extensions import cache
 
 logger = logging.getLogger(__name__)
 
-# --- КОНСТАНТЫ (без изменений) ---
+# --- КОНСТАНТЫ ---
 API_URL = "https://api.rule34.xxx/index.php"
-HEADERS = {'User-Agent': 'Mozilla/5.0 ...'}
+HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36'}
 BLACKLISTED_TAGS = ['loli', 'shota', 'cub', 'gore', 'scat', 'toddler']
+# --- ИСПРАВЛЕНО: Возвращены правильные английские имена переменных ---
 R34_USER_ID = os.getenv("R34_USER_ID")
 R34_API_KEY = os.getenv("R34_API_KEY")
 
 
-# НОВАЯ АСИНХРОННАЯ ФУНКЦИЯ (без кэширования)
-# Она просто делает запрос к API.
 async def _async_fetch_from_api(params: dict) -> list:
     """Асинхронно выполняет сам HTTP-запрос."""
     try:
         async with httpx.AsyncClient() as client:
             api_response = await client.get(API_URL, params=params, headers=HEADERS, timeout=30)
             api_response.raise_for_status()
-            posts = api_response.json()
+            
+            try:
+                posts = api_response.json()
+            except JSONDecodeError:
+                logger.warning(f"API вернул не-JSON ответ. Тело ответа: {api_response.text[:200]}")
+                return []
+
             return posts if isinstance(posts, list) else []
+            
     except (httpx.HTTPStatusError, httpx.RequestError) as e:
         logger.error(f"Ошибка при запросе к API: {e}", exc_info=True)
         return []
 
 
-# ИЗМЕНЕННАЯ СИНХРОННАЯ ФУНКЦИЯ (с кэшированием)
-# Теперь эта функция СИНХРОННАЯ, и декоратор @cache.memoize может с ней работать.
 @cache.memoize(timeout=300)
 def fetch_posts(tags: tuple, page: int, sort_mode: str, user_blacklist: tuple, limit: int) -> list:
     """
     СИНХРОННАЯ обертка, которая кэширует результат.
-    Она подготавливает параметры и вызывает асинхронную функцию для реальной работы.
     """
     logger.info(f"Запрос (не из кэша): {tags}, страница {page}")
     
@@ -57,8 +61,10 @@ def fetch_posts(tags: tuple, page: int, sort_mode: str, user_blacklist: tuple, l
     
     params = {
         "page": "dapi", "s": "post", "q": "index", "tags": tags_str_for_api,
-        "limit": limit, "pid": page, "json": 1, "user_id": R34_USER_ID, "api_key": R34_API_KEY
+        "limit": limit, "pid": page, "json": 1, 
+        # --- ИСПРАВЛЕНО: Теперь эти переменные существуют ---
+        "user_id": R34_USER_ID, 
+        "api_key": R34_API_KEY
     }
     
-    # Запускаем асинхронную функцию из синхронной и ждем результат
     return asyncio.run(_async_fetch_from_api(params))

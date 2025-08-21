@@ -1,0 +1,6 @@
+# requirements.txt
+flask[async]
+httpx
+python-dotenv
+hypercorn
+cachetools

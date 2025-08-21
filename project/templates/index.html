@@ -10,11 +10,11 @@
                 <h1 class="card-title mb-4">Поиск по Rule34</h1>
                 <form action="{{ url_for('gallery.show_gallery') }}" method="get">
                     <div class="mb-3">
-                        <!-- Добавлен класс awesomplete и id="tags-input" -->
                         <input type="text" class="form-control form-control-lg awesomplete" id="tags-input" name="tags" placeholder="например, genshin_impact raidenshogun" required>
                     </div>
                     <div class="mb-4">
-                        <input type="text" class="form-control" name="blacklist" placeholder="Персональный черный список (через пробел)">
+                        <!-- ИСПРАВЛЕНО: Добавлен класс form-control-lg -->
+                        <input type="text" class="form-control form-control-lg" name="blacklist" placeholder="Персональный черный список (через пробел)">
                     </div>
                     <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
                         <button type="submit" class="btn btn-primary btn-lg px-4 gap-3">🔍 Искать</button>
@@ -42,12 +42,11 @@
 document.addEventListener("DOMContentLoaded", function() {
     const input = document.getElementById("tags-input");
     const awesomplete = new Awesomplete(input, {
-        minChars: 2, // Начинать поиск после ввода 2 символов
-        list: []     // Изначально список пуст
+        minChars: 2,
+        list: []
     });
 
     input.addEventListener("input", async function() {
-        // Получаем последнее слово из строки ввода
         const parts = this.value.split(" ");
         const currentTag = parts[parts.length - 1];
 
@@ -55,11 +54,9 @@ document.addEventListener("DOMContentLoaded", function() {
             return;
         }
 
-        // Отправляем запрос на наш API
         try {
             const response = await fetch(`/api/autocomplete?q=${encodeURIComponent(currentTag)}`);
             const suggestions = await response.json();
-            // Обновляем список подсказок в библиотеке
             awesomplete.list = suggestions;
         } catch (error) {
             console.error("Autocomplete error:", error);

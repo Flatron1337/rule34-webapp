@@ -1,49 +1,40 @@
-# project/gallery/api.py
 import os
 import httpx
 import logging
-import asyncio
-from json.decoder import JSONDecodeError
+import json
 from project.extensions import cache
 
 logger = logging.getLogger(__name__)
 
-# --- КОНСТАНТЫ ---
 API_URL = "https://api.rule34.xxx/index.php"
+# Эмулируем браузер
 HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36'}
+
 BLACKLISTED_TAGS = ['loli', 'shota', 'cub', 'gore', 'scat', 'toddler']
-# --- ИСПРАВЛЕНО: Возвращены правильные английские имена переменных ---
+
 R34_USER_ID = os.getenv("R34_USER_ID")
 R34_API_KEY = os.getenv("R34_API_KEY")
 
+class Rule34Error(Exception):
+    pass
 
-async def _async_fetch_from_api(params: dict) -> list:
-    """Асинхронно выполняет сам HTTP-запрос."""
-    try:
-        async with httpx.AsyncClient() as client:
-            api_response = await client.get(API_URL, params=params, headers=HEADERS, timeout=30)
-            api_response.raise_for_status()
-            
-            try:
-                posts = api_response.json()
-            except JSONDecodeError:
-                logger.warning(f"API вернул не-JSON ответ. Тело ответа: {api_response.text[:200]}")
-                return []
+def _make_cache_key(tags, page, sort_mode, user_blacklist, limit):
+    """Создает уникальный ключ для кэша"""
+    key_parts = [str(tags), str(page), sort_mode, str(user_blacklist), str(limit)]
+    return "view_cache:" + "|".join(key_parts)
 
-            return posts if isinstance(posts, list) else []
-            
-    except (httpx.HTTPStatusError, httpx.RequestError) as e:
-        logger.error(f"Ошибка при запросе к API: {e}", exc_info=True)
-        return []
-
-
-@cache.memoize(timeout=300)
-def fetch_posts(tags: tuple, page: int, sort_mode: str, user_blacklist: tuple, limit: int) -> list:
+async def get_posts(tags: tuple, page: int, sort_mode: str, user_blacklist: tuple, limit: int) -> list:
     """
-    СИНХРОННАЯ обертка, которая кэширует результат.
+    Асинхронная функция получения постов с ручным кэшированием Redis.
     """
-    logger.info(f"Запрос (не из кэша): {tags}, страница {page}")
-    
+    # 1. Проверяем кэш
+    cache_key = _make_cache_key(tags, page, sort_mode, user_blacklist, limit)
+    cached_data = cache.get(cache_key)
+    if cached_data:
+        logger.info(f"HIT Cache: {cache_key}")
+        return cached_data
+
+    # 2. Подготовка тегов
     all_blacklist = BLACKLISTED_TAGS + list(user_blacklist)
     negative_tags = [f"-{tag}" for tag in all_blacklist if tag]
     
@@ -61,10 +52,56 @@ def fetch_posts(tags: tuple, page: int, sort_mode: str, user_blacklist: tuple, l
     
     params = {
         "page": "dapi", "s": "post", "q": "index", "tags": tags_str_for_api,
-        "limit": limit, "pid": page, "json": 1, 
-        # --- ИСПРАВЛЕНО: Теперь эти переменные существуют ---
-        "user_id": R34_USER_ID, 
-        "api_key": R34_API_KEY
+        "limit": limit, "pid": page, "json": 1
     }
     
-    return asyncio.run(_async_fetch_from_api(params))
+    if R34_USER_ID: params["user_id"] = R34_USER_ID
+    if R34_API_KEY: params["api_key"] = R34_API_KEY
+
+    # 3. Асинхронный запрос
+    logger.info(f"Запрос к API: {tags_str_for_api}, page={page}")
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(API_URL, params=params, headers=HEADERS, timeout=15.0)
+            response.raise_for_status()
+            
+            try:
+                data = response.json()
+            except json.JSONDecodeError:
+                # Иногда API возвращает пустую строку при отсутствии результатов
+                if not response.text.strip():
+                    return []
+                logger.error(f"Invalid JSON from API: {response.text[:100]}")
+                raise Rule34Error("Ошибка чтения ответа от API")
+
+            if not isinstance(data, list):
+                return []
+
+            # 4. Нормализация данных (выбираем правильные URL для превью)
+            processed_posts = []
+            for post in data:
+                # API R34 обычно возвращает: file_url, preview_url, sample_url
+                # Иногда sample_url может отсутствовать
+                processed_posts.append({
+                    "id": post.get("id"),
+                    "score": post.get("score"),
+                    "tags": post.get("tags", ""),
+                    # Оптимизация трафика:
+                    "preview_url": post.get("preview_url") or post.get("sample_url") or post.get("file_url"),
+                    "sample_url": post.get("sample_url") or post.get("file_url"),
+                    "file_url": post.get("file_url"),
+                    "type": "video" if post.get("file_url", "").endswith((".mp4", ".webm")) else "image",
+                    "width": post.get("width"),
+                    "height": post.get("height")
+                })
+
+            # 5. Сохраняем в кэш (5 минут)
+            cache.set(cache_key, processed_posts, timeout=300)
+            return processed_posts
+
+    except httpx.RequestError as e:
+        logger.error(f"Network error: {e}")
+        raise Rule34Error("Не удалось соединиться с сервером Rule34")
+    except httpx.HTTPStatusError as e:
+        logger.error(f"HTTP error: {e}")
+        raise Rule34Error(f"Ошибка API: {e.response.status_code}")

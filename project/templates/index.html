@@ -1,33 +1,46 @@
-<!-- project/templates/index.html -->
 {% extends "base.html" %}
-{% block title %}Поиск по Rule34{% endblock %}
+{% block title %}Поиск Rule34{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-lg-6">
-        <div class="card bg-dark text-white shadow-lg">
+<div class="row justify-content-center mt-5">
+    <div class="col-lg-8">
+        <div class="card bg-dark text-white shadow-lg border-secondary">
             <div class="card-body p-5 text-center">
-                <h1 class="card-title mb-4">Поиск по Rule34</h1>
+                <h1 class="display-4 mb-4 fw-bold">R34 <span class="text-primary">Search</span></h1>
+                
                 <form action="{{ url_for('gallery.show_gallery') }}" method="get">
-                    <div class="mb-3">
-                        <input type="text" class="form-control form-control-lg awesomplete" id="tags-input" name="tags" placeholder="например, genshin_impact raidenshogun" required>
+                    <div class="mb-3 text-start">
+                        <label class="form-label text-muted">Поиск (теги через пробел)</label>
+                        <input type="text" class="form-control form-control-lg awesomplete-input bg-dark text-white border-secondary" 
+                               name="tags" placeholder="genshin_impact yelan" autofocus required>
                     </div>
-                    <div class="mb-4">
-                        <!-- ИСПРАВЛЕНО: Добавлен класс form-control-lg -->
-                        <input type="text" class="form-control form-control-lg" name="blacklist" placeholder="Персональный черный список (через пробел)">
+                    
+                    <div class="accordion mb-4" id="advSearch">
+                        <div class="accordion-item bg-transparent border-0">
+                             <h2 class="accordion-header">
+                                <button class="accordion-button collapsed bg-transparent text-white shadow-none p-0" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOpt">
+                                    <small>➕ Черный список</small>
+                                </button>
+                            </h2>
+                            <div id="collapseOpt" class="accordion-collapse collapse" data-bs-parent="#advSearch">
+                                <div class="accordion-body px-0">
+                                    <input type="text" class="form-control bg-dark text-white border-secondary" name="blacklist" placeholder="tags to exclude">
+                                </div>
+                            </div>
+                        </div>
                     </div>
+
                     <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
-                        <button type="submit" class="btn btn-primary btn-lg px-4 gap-3">🔍 Искать</button>
-                        <a href="{{ url_for('main.random_post') }}" class="btn btn-outline-light btn-lg px-4">🎲 Случайный пост</a>
+                        <button type="submit" class="btn btn-primary btn-lg px-5">🔍 Искать</button>
+                        <a href="{{ url_for('main.random_post') }}" class="btn btn-outline-light btn-lg px-4">🎲 Random</a>
                     </div>
                 </form>
                 
                 {% if history %}
-                <hr class="my-4">
-                <h5 class="text-white-50">История поиска:</h5>
-                <div>
+                <div class="mt-4 pt-3 border-top border-secondary">
+                    <small class="text-muted d-block mb-2">Недавние:</small>
                     {% for item in history %}
-                        <a href="{{ url_for('gallery.show_gallery', tags=item) }}" class="btn btn-sm btn-outline-secondary m-1">{{ item }}</a>
+                        <a href="{{ url_for('gallery.show_gallery', tags=item) }}" class="badge bg-secondary text-decoration-none me-1">{{ item }}</a>
                     {% endfor %}
                 </div>
                 {% endif %}
@@ -35,33 +48,4 @@
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-    const input = document.getElementById("tags-input");
-    const awesomplete = new Awesomplete(input, {
-        minChars: 2,
-        list: []
-    });
-
-    input.addEventListener("input", async function() {
-        const parts = this.value.split(" ");
-        const currentTag = parts[parts.length - 1];
-
-        if (currentTag.length < awesomplete.minChars) {
-            return;
-        }
-
-        try {
-            const response = await fetch(`/api/autocomplete?q=${encodeURIComponent(currentTag)}`);
-            const suggestions = await response.json();
-            awesomplete.list = suggestions;
-        } catch (error) {
-            console.error("Autocomplete error:", error);
-        }
-    });
-});
-</script>
 {% endblock %}

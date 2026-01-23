@@ -1,28 +1,42 @@
-# project/__init__.py
 import os
 from flask import Flask
 from dotenv import load_dotenv
-from .extensions import cache
+from .extensions import cache, db
 
 def create_app():
     load_dotenv()
     app = Flask(__name__)
 
-    # Конфигурация из переменных окружения
-    app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
+    # --- Конфигурация ---
+    app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-key-change-me")
+    
+    # Redis Config
     app.config["CACHE_TYPE"] = "RedisCache"
-    app.config["CACHE_REDIS_URL"] = os.getenv("CACHE_REDIS_URL")
-    app.config["CACHE_DEFAULT_TIMEOUT"] = 300 # 5 минут
+    app.config["CACHE_REDIS_URL"] = os.getenv("CACHE_REDIS_URL", "redis://localhost:6379/0")
+    app.config["CACHE_DEFAULT_TIMEOUT"] = int(os.getenv("CACHE_TIMEOUT", 300))
 
-    # Инициализация расширений
+    # DB Config (SQLite)
+    # Используем /tmp/db.sqlite для Render (временное хранилище) или файл в папке
+    # На бесплатном Render диск стирается при перезапуске, для персистентности нужен Render Disk
+    db_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "../instance")
+    os.makedirs(db_path, exist_ok=True)
+    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{os.path.join(db_path, 'favorites.db')}"
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+    # Инициализация
     cache.init_app(app)
+    db.init_app(app)
+
+    with app.app_context():
+        db.create_all()
 
     # Регистрация Blueprints
     from .main.routes import main_bp
     from .gallery.routes import gallery_bp
-    from .api.routes import api_bp  # <--- ДОБАВЛЕНО
+    from .api.routes import api_bp
+    
     app.register_blueprint(main_bp)
     app.register_blueprint(gallery_bp)
-    app.register_blueprint(api_bp)    # <--- ДОБАВЛЕНО
+    app.register_blueprint(api_bp)
 
     return app

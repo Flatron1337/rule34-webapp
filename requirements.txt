@@ -1,7 +1,7 @@
-# requirements.txt
 flask[async]
 httpx
 python-dotenv
 hypercorn
 redis
 flask-caching>=2.1.0
+flask-sqlalchemy

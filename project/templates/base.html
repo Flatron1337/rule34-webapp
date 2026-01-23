@@ -1,164 +1,240 @@
 <!doctype html>
 <html lang="ru" data-bs-theme="dark">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}Rule34 WebApp{% endblock %}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/awesomplete/1.1.5/awesomplete.min.css" />
-    <!-- FontAwesome для иконок -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <style>
-      /* --- Masonry Layout --- */
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Rule34 WebApp{% endblock %}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/awesomplete/1.1.5/awesomplete.min.css" />
+  <!-- FontAwesome для иконок -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>❤️</text></svg>">
+
+  <style>
+    /* --- Masonry Layout --- */
+    .masonry-grid {
+      column-count: 4;
+      column-gap: 1rem;
+    }
+
+    .masonry-item {
+      break-inside: avoid;
+      margin-bottom: 1rem;
+      position: relative;
+    }
+
+    @media (max-width: 1200px) {
       .masonry-grid {
-        column-count: 4;
-        column-gap: 1rem;
+        column-count: 3;
       }
-      .masonry-item {
-        break-inside: avoid;
-        margin-bottom: 1rem;
-        position: relative;
-      }
-      @media (max-width: 1200px) { .masonry-grid { column-count: 3; } }
-      @media (max-width: 768px) { .masonry-grid { column-count: 2; } }
-      @media (max-width: 480px) { .masonry-grid { column-count: 1; } }
+    }
 
-      .post-media { width: 100%; height: auto; display: block; border-radius: 4px; cursor: pointer;}
-      
-      /* Сердечко */
-      .fav-btn {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        background: rgba(0,0,0,0.5);
-        border: none;
-        border-radius: 50%;
-        width: 35px;
-        height: 35px;
-        color: white;
-        transition: all 0.2s;
-        z-index: 10;
+    @media (max-width: 768px) {
+      .masonry-grid {
+        column-count: 2;
       }
-      .fav-btn.active { color: #ff4d4d; }
-      .fav-btn:hover { transform: scale(1.1); background: rgba(0,0,0,0.8); }
+    }
 
-      /* Awesomplete Dark Theme Tweaks */
-      div.awesomplete > ul {
-        background-color: #212529 !important;
-        border: 1px solid #495057 !important;
-        color: #adb5bd !important;
-        z-index: 1000;
+    @media (max-width: 480px) {
+      .masonry-grid {
+        column-count: 1;
       }
-      div.awesomplete > ul > li:hover, div.awesomplete > ul > li[aria-selected="true"] {
-        background: #0d6efd !important;
-        color: white !important;
-      }
-      div.awesomplete mark { background: none; color: #fff; font-weight: bold; }
+    }
 
-      /* Back to Top */
-      #btn-back-to-top {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        display: none;
-        z-index: 99;
-      }
-      
-      /* Lightbox Tags */
-      .tag-badge { margin-right: 5px; margin-bottom: 5px; cursor: pointer; text-decoration: none;}
-      .tag-general { background-color: #0d6efd; } /* Blue */
-      .tag-character { background-color: #198754; } /* Green */
-      .tag-artist { background-color: #dc3545; } /* Red */
-      .tag-copyright { background-color: #6f42c1; } /* Purple */
-    </style>
-  </head>
-  <body class="bg-dark-subtle">
-    <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
-      <div class="container">
-        <a class="navbar-brand" href="{{ url_for('main.index') }}">R34 App</a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-          <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarNav">
-          <ul class="navbar-nav ms-auto">
-            <li class="nav-item"><a class="nav-link" href="{{ url_for('main.index') }}">Поиск</a></li>
-            <li class="nav-item"><a class="nav-link" href="{{ url_for('gallery.show_favorites') }}">❤️ Избранное</a></li>
-          </ul>
-        </div>
-      </div>
-    </nav>
+    .post-media {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 4px;
+      cursor: pointer;
+    }
 
+    /* Сердечко */
+    .fav-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.5);
+      border: none;
+      border-radius: 50%;
+      width: 35px;
+      height: 35px;
+      color: white;
+      transition: all 0.2s;
+      z-index: 10;
+    }
+
+    .fav-btn.active {
+      color: #ff4d4d;
+    }
+
+    .fav-btn:hover {
+      transform: scale(1.1);
+      background: rgba(0, 0, 0, 0.8);
+    }
+
+    /* Awesomplete Dark Theme Tweaks */
+    div.awesomplete>ul {
+      background-color: #212529 !important;
+      border: 1px solid #495057 !important;
+      color: #adb5bd !important;
+      z-index: 1000;
+    }
+
+    div.awesomplete>ul>li:hover,
+    div.awesomplete>ul>li[aria-selected="true"] {
+      background: #0d6efd !important;
+      color: white !important;
+    }
+
+    div.awesomplete mark {
+      background: none;
+      color: #fff;
+      font-weight: bold;
+    }
+
+    /* Back to Top */
+    #btn-back-to-top {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      display: none;
+      z-index: 99;
+    }
+
+    /* Lightbox Tags */
+    .tag-badge {
+      margin-right: 5px;
+      margin-bottom: 5px;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .tag-general {
+      background-color: #0d6efd;
+    }
+
+    /* Blue */
+    .tag-character {
+      background-color: #198754;
+    }
+
+    /* Green */
+    .tag-artist {
+      background-color: #dc3545;
+    }
+
+    /* Red */
+    .tag-copyright {
+      background-color: #6f42c1;
+    }
+
+    /* Purple */
+    #lightbox-tags {
+      max-height: 150px;
+      /* Ограничиваем высоту */
+      overflow-y: auto;
+      /* Добавляем прокрутку, если тегов много */
+      justify-content: center;
+      /* Центрируем теги */
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.2);
+      /* Слегка затемняем фон под тегами */
+      border-radius: 8px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+
+<body class="bg-dark-subtle">
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
     <div class="container">
-        <!-- Сообщения Flash -->
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            {% for category, message in messages %}
-              <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-              </div>
-            {% endfor %}
-          {% endif %}
-        {% endwith %}
-
-        {% block content %}{% endblock %}
+      <a class="navbar-brand" href="{{ url_for('main.index') }}">R34 App</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('main.index') }}">Поиск</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('gallery.show_favorites') }}">❤️ Избранное</a></li>
+        </ul>
+      </div>
     </div>
+  </nav>
 
-    <!-- Back to top button -->
-    <button type="button" class="btn btn-primary btn-lg rounded-circle shadow" id="btn-back-to-top">
-      <i class="fas fa-arrow-up"></i>
-    </button>
+  <div class="container">
+    <!-- Сообщения Flash -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/awesomplete/1.1.5/awesomplete.min.js"></script>
-    
-    <script>
-      // Back to Top Logic
-      let mybutton = document.getElementById("btn-back-to-top");
-      window.onscroll = function () {
-        if (document.body.scrollTop > 20 || document.documentElement.scrollTop > 20) {
-          mybutton.style.display = "block";
-        } else {
-          mybutton.style.display = "none";
-        }
-      };
-      mybutton.addEventListener("click", function () {
-        document.body.scrollTop = 0;
-        document.documentElement.scrollTop = 0;
+    {% block content %}{% endblock %}
+  </div>
+
+  <!-- Back to top button -->
+  <button type="button" class="btn btn-primary btn-lg rounded-circle shadow" id="btn-back-to-top">
+    <i class="fas fa-arrow-up"></i>
+  </button>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/awesomplete/1.1.5/awesomplete.min.js"></script>
+
+  <script>
+    // Back to Top Logic
+    let mybutton = document.getElementById("btn-back-to-top");
+    window.onscroll = function () {
+      if (document.body.scrollTop > 20 || document.documentElement.scrollTop > 20) {
+        mybutton.style.display = "block";
+      } else {
+        mybutton.style.display = "none";
+      }
+    };
+    mybutton.addEventListener("click", function () {
+      document.body.scrollTop = 0;
+      document.documentElement.scrollTop = 0;
+    });
+
+    // Глобальная настройка автокомплита для всех полей с классом 'awesomplete-input'
+    document.addEventListener("DOMContentLoaded", function () {
+      const inputs = document.querySelectorAll(".awesomplete-input");
+      inputs.forEach(input => {
+        const awesomplete = new Awesomplete(input, {
+          minChars: 2,
+          maxItems: 10,
+          filter: function (text, input) {
+            return Awesomplete.FILTER_CONTAINS(text, input.match(/[^ ]*$/)[0]);
+          },
+          replace: function (text) {
+            var before = this.input.value.match(/^.+ \s*|/)[0];
+            this.input.value = before + text + " ";
+          }
+        });
+
+        input.addEventListener("input", async function () {
+          const parts = this.value.split(" ");
+          const currentTag = parts[parts.length - 1];
+          if (currentTag.length < 2) return;
+
+          try {
+            const response = await fetch(`/api/autocomplete?q=${encodeURIComponent(currentTag)}`);
+            const suggestions = await response.json();
+            awesomplete.list = suggestions;
+          } catch (e) { console.error(e); }
+        });
       });
+    });
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
 
-      // Глобальная настройка автокомплита для всех полей с классом 'awesomplete-input'
-      document.addEventListener("DOMContentLoaded", function() {
-          const inputs = document.querySelectorAll(".awesomplete-input");
-          inputs.forEach(input => {
-              const awesomplete = new Awesomplete(input, {
-                  minChars: 2,
-                  maxItems: 10,
-                  filter: function(text, input) {
-                    return Awesomplete.FILTER_CONTAINS(text, input.match(/[^ ]*$/)[0]);
-                  },
-                  replace: function(text) {
-                    var before = this.input.value.match(/^.+ \s*|/)[0];
-                    this.input.value = before + text + " ";
-                  }
-              });
-
-              input.addEventListener("input", async function() {
-                  const parts = this.value.split(" ");
-                  const currentTag = parts[parts.length - 1];
-                  if (currentTag.length < 2) return;
-                  
-                  try {
-                      const response = await fetch(`/api/autocomplete?q=${encodeURIComponent(currentTag)}`);
-                      const suggestions = await response.json();
-                      awesomplete.list = suggestions;
-                  } catch (e) { console.error(e); }
-              });
-          });
-      });
-    </script>
-    {% block scripts %}{% endblock %}
-  </body>
 </html>

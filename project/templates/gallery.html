@@ -6,196 +6,186 @@
     <h3>{{ tags if not is_favorites else "❤️ Моё избранное" }}</h3>
     {% if not is_favorites %}
     <div class="btn-group mt-2">
-        <a href="{{ url_for('gallery.show_gallery', tags=tags, blacklist=user_blacklist, page=0, sort='score') }}" class="btn btn-sm btn-outline-light {% if sort_mode == 'score' %}active{% endif %}">Рейтинг</a>
-        <a href="{{ url_for('gallery.show_gallery', tags=tags, blacklist=user_blacklist, page=0, sort='date') }}" class="btn btn-sm btn-outline-light {% if sort_mode == 'date' %}active{% endif %}">Дата</a>
+        <a href="{{ url_for('gallery.show_gallery', tags=tags, blacklist=user_blacklist, page=0, sort='score') }}"
+            class="btn btn-sm btn-outline-light {% if sort_mode == 'score' %}active{% endif %}">Рейтинг</a>
+        <a href="{{ url_for('gallery.show_gallery', tags=tags, blacklist=user_blacklist, page=0, sort='date') }}"
+            class="btn btn-sm btn-outline-light {% if sort_mode == 'date' %}active{% endif %}">Дата</a>
     </div>
     {% endif %}
 </div>
 
 {% if posts %}
-    <!-- Masonry Grid -->
-    <div class="masonry-grid">
-        {% for post in posts %}
-        <div class="masonry-item card bg-dark border-0">
-            <!-- 
+<!-- Masonry Grid -->
+<div class="masonry-grid">
+    {% for post in posts %}
+    <div class="masonry-item card bg-dark border-0">
+        <!-- 
                 Кнопка Избранного.
                 Вместо сложного onclick, мы кладем данные в data-атрибуты.
                 Jinja2 автоматически экранирует кавычки внутри атрибутов.
             -->
-            <button class="fav-btn {% if post.id in fav_ids %}active{% endif %}" 
-                    type="button"
-                    onclick="handleFav(this)"
-                    data-id="{{ post.id }}"
-                    data-file="{{ post.file_url }}"
-                    data-preview="{{ post.preview_url }}"
-                    data-type="{{ post.type }}"
-                    data-tags="{{ post.tags }}">
-                <i class="fas fa-heart"></i>
-            </button>
+        <button class="fav-btn {% if post.id in fav_ids %}active{% endif %}" type="button" onclick="handleFav(this)"
+            data-id="{{ post.id }}" data-file="{{ post.file_url }}" data-preview="{{ post.preview_url }}"
+            data-type="{{ post.type }}" data-tags="{{ post.tags }}">
+            <i class="fas fa-heart"></i>
+        </button>
 
-            <!-- Медиа контент -->
-            {% if post.type == 'video' %}
-                <img src="{{ post.preview_url }}" 
-                     class="post-media" 
-                     loading="lazy"
-                     alt="Video preview"
-                     onerror="this.src='{{ post.file_url }}'"
-                     onclick="handleLightbox(this)"
-                     data-file="{{ post.file_url }}"
-                     data-type="video"
-                     data-tags="{{ post.tags }}">
-                <div class="position-absolute bottom-0 start-0 p-1 text-white"><i class="fas fa-video"></i></div>
-            {% else %}
-                <img src="{{ post.preview_url }}" 
-                     class="post-media" 
-                     loading="lazy"
-                     alt="Image preview"
-                     onclick="handleLightbox(this)"
-                     data-file="{{ post.file_url }}"
-                     data-type="image"
-                     data-tags="{{ post.tags }}">
-            {% endif %}
-        </div>
-        {% endfor %}
+        <!-- Медиа контент -->
+        {% if post.type == 'video' %}
+        <img src="{{ post.preview_url }}" class="post-media" loading="lazy" alt="Video preview"
+            onerror="this.src='{{ post.file_url }}'" onclick="handleLightbox(this)" data-file="{{ post.file_url }}"
+            data-type="video" data-tags="{{ post.tags }}">
+        <div class="position-absolute bottom-0 start-0 p-1 text-white"><i class="fas fa-video"></i></div>
+        {% else %}
+        <img src="{{ post.preview_url }}" class="post-media" loading="lazy" alt="Image preview"
+            onclick="handleLightbox(this)" data-file="{{ post.file_url }}" data-type="image"
+            data-tags="{{ post.tags }}">
+        {% endif %}
     </div>
+    {% endfor %}
+</div>
 
-    <!-- Пагинация -->
-    {% if not is_favorites %}
-    <nav class="mt-5 d-flex justify-content-center">
-        <ul class="pagination">
-            {% if page > 0 %}
-            <li class="page-item"><a class="page-link" href="{{ url_for('gallery.show_gallery', tags=tags, blacklist=user_blacklist, page=page-1, sort=sort_mode) }}">←</a></li>
-            {% endif %}
-            
-            <li class="page-item disabled"><span class="page-link">{{ page + 1 }}</span></li>
+<!-- Пагинация -->
+{% if not is_favorites %}
+<nav class="mt-5 d-flex justify-content-center">
+    <ul class="pagination">
+        {% if page > 0 %}
+        <li class="page-item"><a class="page-link"
+                href="{{ url_for('gallery.show_gallery', tags=tags, blacklist=user_blacklist, page=page-1, sort=sort_mode) }}">←</a>
+        </li>
+        {% endif %}
 
-            {% if posts|length == limit %}
-            <li class="page-item"><a class="page-link" href="{{ url_for('gallery.show_gallery', tags=tags, blacklist=user_blacklist, page=page+1, sort=sort_mode) }}">→</a></li>
-            {% endif %}
-        </ul>
-    </nav>
-    {% endif %}
+        <li class="page-item disabled"><span class="page-link">{{ page + 1 }}</span></li>
+
+        {% if posts|length == limit %}
+        <li class="page-item"><a class="page-link"
+                href="{{ url_for('gallery.show_gallery', tags=tags, blacklist=user_blacklist, page=page+1, sort=sort_mode) }}">→</a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
 
 {% else %}
-    <div class="alert alert-warning text-center">
-        <h4>Ничего не найдено</h4>
-        <p>Попробуйте изменить запрос.</p>
-    </div>
+<div class="alert alert-warning text-center">
+    <h4>Ничего не найдено</h4>
+    <p>Попробуйте изменить запрос.</p>
+</div>
 {% endif %}
 
 <!-- Lightbox Modal -->
 <div class="modal fade" id="lightboxModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-    <div class="modal-content bg-dark text-white">
-      <div class="modal-header border-0">
-        <h5 class="modal-title fs-6 text-muted">Просмотр</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body text-center p-0" id="lightbox-content"></div>
-      <div class="modal-footer border-0 justify-content-start flex-wrap" id="lightbox-tags"></div>
-      <div class="text-center pb-3 w-100">
-         <a href="#" id="lightbox-dl" class="btn btn-success" download target="_blank">Скачать оригинал</a>
-      </div>
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content bg-dark text-white">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fs-6 text-muted">Просмотр</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center p-0" id="lightbox-content"></div>
+            <div class="modal-footer border-0 justify-content-start flex-wrap" id="lightbox-tags"></div>
+            <div class="text-center pb-3 w-100">
+                <a href="#" id="lightbox-dl" class="btn btn-success" download target="_blank">Скачать оригинал</a>
+            </div>
+        </div>
     </div>
-  </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-// --- Обработчик клика по Лайтбоксу ---
-function handleLightbox(el) {
-    // Получаем данные из data-атрибутов элемента
-    const url = el.dataset.file;
-    const type = el.dataset.type;
-    const tagsStr = el.dataset.tags;
+    // --- Обработчик клика по Лайтбоксу ---
+    function handleLightbox(el) {
+        // Получаем данные из data-атрибутов элемента
+        const url = el.dataset.file;
+        const type = el.dataset.type;
+        const tagsStr = el.dataset.tags;
 
-    const modalBody = document.getElementById('lightbox-content');
-    const tagsContainer = document.getElementById('lightbox-tags');
-    const dlBtn = document.getElementById('lightbox-dl');
-    
-    // Вставка медиа
-    if (type === 'video') {
-        modalBody.innerHTML = `<video controls autoplay loop src="${url}" class="img-fluid" style="max-height:85vh"></video>`;
-    } else {
-        modalBody.innerHTML = `<img src="${url}" class="img-fluid" style="max-height:85vh">`;
+        const modalBody = document.getElementById('lightbox-content');
+        const tagsContainer = document.getElementById('lightbox-tags');
+        const dlBtn = document.getElementById('lightbox-dl');
+
+        // Вставка медиа
+        if (type === 'video') {
+            modalBody.innerHTML = `<video controls autoplay loop src="${url}" class="img-fluid" style="max-height:85vh"></video>`;
+        } else {
+            modalBody.innerHTML = `<img src="${url}" class="img-fluid" style="max-height:85vh">`;
+        }
+
+        dlBtn.href = url;
+
+        // Теги
+        tagsContainer.innerHTML = '';
+        if (tagsStr) {
+            const tags = tagsStr.split(' ');
+            tags.forEach(tag => {
+                if (!tag) return;
+                const span = document.createElement('a');
+                span.className = `badge rounded-pill tag-general tag-badge text-decoration-none`;
+                span.style.backgroundColor = '#0d6efd';
+                span.style.marginRight = '5px';
+                span.style.marginBottom = '5px';
+                span.textContent = tag;
+                span.href = `/gallery?tags=${encodeURIComponent(tag)}`;
+                tagsContainer.appendChild(span);
+            });
+        }
+
+        new bootstrap.Modal(document.getElementById('lightboxModal')).show();
+
+        document.getElementById('lightboxModal').addEventListener('hidden.bs.modal', function () {
+            modalBody.innerHTML = '';
+        }, { once: true });
     }
 
-    dlBtn.href = url;
+    // --- Обработчик клика по Избранному ---
+    async function handleFav(btn) {
+        // Получаем данные из data-атрибутов
+        const postId = btn.dataset.id;
+        const fileUrl = btn.dataset.file;
+        const previewUrl = btn.dataset.preview;
+        const type = btn.dataset.type;
+        const tags = btn.dataset.tags;
 
-    // Теги
-    tagsContainer.innerHTML = '';
-    if (tagsStr) {
-        const tags = tagsStr.split(' ');
-        tags.forEach(tag => {
-            if (!tag) return;
-            const span = document.createElement('a');
-            span.className = `badge rounded-pill tag-general tag-badge text-decoration-none`;
-            span.style.backgroundColor = '#0d6efd';
-            span.style.marginRight = '5px';
-            span.style.marginBottom = '5px';
-            span.textContent = tag;
-            span.href = `/gallery?tags=${encodeURIComponent(tag)}`;
-            tagsContainer.appendChild(span);
-        });
-    }
-    
-    new bootstrap.Modal(document.getElementById('lightboxModal')).show();
-    
-    document.getElementById('lightboxModal').addEventListener('hidden.bs.modal', function () {
-        modalBody.innerHTML = '';
-    }, { once: true });
-}
+        // Анимация
+        btn.style.transform = "scale(0.8)";
+        setTimeout(() => btn.style.transform = "scale(1)", 200);
 
-// --- Обработчик клика по Избранному ---
-async function handleFav(btn) {
-    // Получаем данные из data-атрибутов
-    const postId = btn.dataset.id;
-    const fileUrl = btn.dataset.file;
-    const previewUrl = btn.dataset.preview;
-    const type = btn.dataset.type;
-    const tags = btn.dataset.tags;
+        try {
+            const response = await fetch('/api/favorite', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    post_id: postId,
+                    file_url: fileUrl,
+                    preview_url: previewUrl,
+                    media_type: type,
+                    tags: tags
+                })
+            });
 
-    // Анимация
-    btn.style.transform = "scale(0.8)";
-    setTimeout(() => btn.style.transform = "scale(1)", 200);
+            if (!response.ok) throw new Error("API Error");
 
-    try {
-        const response = await fetch('/api/favorite', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                post_id: postId,
-                file_url: fileUrl,
-                preview_url: previewUrl,
-                media_type: type,
-                tags: tags
-            })
-        });
-        
-        if (!response.ok) throw new Error("API Error");
+            const res = await response.json();
 
-        const res = await response.json();
-        
-        if (res.status === 'success') {
-            if (res.action === 'added') {
-                btn.classList.add('active');
-            } else {
-                btn.classList.remove('active');
-                if (window.location.pathname.includes('/favorites')) {
-                    const card = btn.closest('.masonry-item');
-                    if (card) {
-                        card.style.transition = 'opacity 0.3s';
-                        card.style.opacity = '0';
-                        setTimeout(() => card.remove(), 300);
+            if (res.status === 'success') {
+                if (res.action === 'added') {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                    if (window.location.pathname.includes('/favorites')) {
+                        const card = btn.closest('.masonry-item');
+                        if (card) {
+                            card.style.transition = 'opacity 0.3s';
+                            card.style.opacity = '0';
+                            setTimeout(() => card.remove(), 300);
+                        }
                     }
                 }
             }
+        } catch (e) {
+            console.error("Fav error:", e);
+            // Можно добавить уведомление об ошибке
         }
-    } catch (e) {
-        console.error("Fav error:", e);
-        // Можно добавить уведомление об ошибке
     }
-}
 </script>
 {% endblock %}

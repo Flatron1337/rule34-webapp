@@ -1,5 +1,5 @@
 import httpx
-from flask import Blueprint, render_template, request, session, redirect, url_for, flash, Response, jsonify
+from flask import Blueprint, render_template, request, session, redirect, url_for, flash, Response, jsonify, current_app
 from project.extensions import db
 from project.models import Favorite
 from .api import get_posts, Rule34Error
@@ -38,20 +38,26 @@ async def show_gallery():
     error_msg = None
 
     try:
-        # AWAIT вызов
+        # AWAIT вызов API
         posts = await get_posts(tags_tuple, page, sort_mode, user_blacklist_tuple, GALLERY_LIMIT)
     except Rule34Error as e:
         error_msg = str(e)
         flash(error_msg, "danger")
 
-    # Получаем список ID избранного для этого IP, чтобы подсветить сердечки
+    # Получаем список ID избранного для этого IP
     user_ip = get_client_ip()
     fav_ids = []
-    # Работа с БД синхронная (SQLAlchemy async требует драйверов aiosqlite/asyncpg)
-    # В контексте Flask 2.0+ и малого объема это допустимо внутри async route
-    with gallery_bp.app.app_context():
+    
+    # --- ИСПРАВЛЕНИЕ: Убран лишний контекст, прямой запрос к БД ---
+    # Flask-SQLAlchemy (синхронный) внутри async роута работает, но блокирует поток.
+    # Для простых приложений это допустимо.
+    try:
         favs = Favorite.query.filter_by(user_ip=user_ip).with_entities(Favorite.post_id).all()
         fav_ids = [f.post_id for f in favs]
+    except Exception as e:
+        print(f"DB Error (read): {e}")
+        # Игнорируем ошибку БД при чтении списка, чтобы галерея все равно открылась
+        fav_ids = []
 
     page_range = range(max(0, page - 2), page + 3)
 
@@ -73,35 +79,39 @@ async def show_gallery():
 @gallery_bp.route('/api/favorite', methods=['POST'])
 def toggle_favorite():
     """AJAX endpoint для добавления/удаления избранного"""
-    data = request.json
-    user_ip = get_client_ip()
-    post_id = int(data.get('post_id'))
-    
-    existing = Favorite.query.filter_by(user_ip=user_ip, post_id=post_id).first()
-    
-    if existing:
-        db.session.delete(existing)
-        action = 'removed'
-    else:
-        new_fav = Favorite(
-            user_ip=user_ip,
-            post_id=post_id,
-            file_url=data.get('file_url'),
-            preview_url=data.get('preview_url'),
-            tags=data.get('tags'),
-            media_type=data.get('media_type', 'image')
-        )
-        db.session.add(new_fav)
-        action = 'added'
-    
-    db.session.commit()
-    return jsonify({"status": "success", "action": action})
+    try:
+        data = request.json
+        user_ip = get_client_ip()
+        post_id = int(data.get('post_id'))
+        
+        existing = Favorite.query.filter_by(user_ip=user_ip, post_id=post_id).first()
+        
+        if existing:
+            db.session.delete(existing)
+            action = 'removed'
+        else:
+            new_fav = Favorite(
+                user_ip=user_ip,
+                post_id=post_id,
+                file_url=data.get('file_url'),
+                preview_url=data.get('preview_url'),
+                tags=data.get('tags'),
+                media_type=data.get('media_type', 'image')
+            )
+            db.session.add(new_fav)
+            action = 'added'
+        
+        db.session.commit()
+        return jsonify({"status": "success", "action": action})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @gallery_bp.route('/favorites')
 def show_favorites():
     user_ip = get_client_ip()
+    # Прямой запрос без лишних контекстов
     favorites = Favorite.query.filter_by(user_ip=user_ip).order_by(Favorite.created_at.desc()).all()
-    # Преобразуем формат объекта БД в формат словаря, ожидаемый шаблоном
+    
     posts = [{
         'id': f.post_id,
         'file_url': f.file_url,
@@ -114,7 +124,7 @@ def show_favorites():
     return render_template('gallery.html', posts=posts, tags="Избранное", sort_mode="date", page=-1, fav_ids=[p['id'] for p in posts], is_favorites=True)
 
 
-# --- ПРОКСИРОВАНИЕ (Privacy / Anti-block) ---
+# --- ПРОКСИРОВАНИЕ ---
 @gallery_bp.route('/proxy/image')
 async def proxy_image():
     url = request.args.get('url')

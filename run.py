@@ -6,11 +6,14 @@ from project.extensions import db
 # 1. Создаем Flask приложение
 flask_app = create_app()
 
-# 2. ИСПРАВЛЕНИЕ: Принудительно создаем таблицы БД перед стартом
-# Это гарантирует, что таблица 'favorite' существует до первого запроса
+# 2. ВАЖНО: Создаем таблицы БД (favorites) перед запуском
+# Это решает проблему "no such table: favorite"
 with flask_app.app_context():
-    db.create_all()
-    print("Database tables created successfully.")
+    try:
+        db.create_all()
+        print(">>> База данных и таблицы успешно инициализированы.")
+    except Exception as e:
+        print(f">>> Ошибка инициализации БД: {e}")
 
 # 3. Оборачиваем в ASGI для Hypercorn
 app = WsgiToAsgi(flask_app)

@@ -2,6 +2,7 @@ import os
 from flask import Flask
 from dotenv import load_dotenv
 from .extensions import cache, db
+from .admin.firebase_admin import init_firebase_admin
 
 def create_app():
     load_dotenv()
@@ -30,6 +31,23 @@ def create_app():
     with app.app_context():
         db.create_all()
 
+    # Firebase Admin SDK (for admin APIs / reading telemetry)
+    # If initialization fails, either:
+    # - skip registering admin routes (default), or
+    # - fail fast at startup when REQUIRE_FIREBASE_ADMIN=1.
+    firebase_ready = True
+    try:
+        init_firebase_admin()
+    except Exception as e:
+        firebase_ready = False
+        app.logger.exception("Firebase Admin SDK initialization failed; admin routes will be disabled.")
+        if os.getenv("REQUIRE_FIREBASE_ADMIN", "").strip() in {"1", "true", "True", "yes", "YES"}:
+            raise RuntimeError(
+                "Firebase Admin SDK failed to initialize and REQUIRE_FIREBASE_ADMIN is set. "
+                "Fix Firebase credentials/configuration or unset REQUIRE_FIREBASE_ADMIN to boot without admin routes."
+            ) from e
+    app.config["FIREBASE_ADMIN_READY"] = firebase_ready
+
     # Регистрация Blueprints
     from .main.routes import main_bp
     from .gallery.routes import gallery_bp
@@ -38,5 +56,8 @@ def create_app():
     app.register_blueprint(main_bp)
     app.register_blueprint(gallery_bp)
     app.register_blueprint(api_bp)
+    if firebase_ready:
+        from .admin.routes import admin_bp
+        app.register_blueprint(admin_bp)
 
     return app

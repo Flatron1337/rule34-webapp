@@ -5,3 +5,4 @@ hypercorn
 redis
 flask-caching>=2.1.0
 flask-sqlalchemy
+firebase-admin>=6.5.0

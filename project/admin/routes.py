@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, jsonify, request
 from firebase_admin import firestore
+from google.api_core.exceptions import GoogleAPICallError
 from google.auth.exceptions import DefaultCredentialsError
 
 from .auth import require_admin
@@ -32,8 +33,11 @@ def stats_overview():
     - hours: window size (default 24)
     - limit: max events scanned (default 5000)
     """
-    hours = int(request.args.get("hours", 24))
-    limit = int(request.args.get("limit", 5000))
+    try:
+        hours = int(request.args.get("hours", 24))
+        limit = int(request.args.get("limit", 5000))
+    except (TypeError, ValueError):
+        return jsonify({"error": "invalid_query_params", "fields": ["hours", "limit"]}), 400
     hours = max(1, min(hours, 24 * 30))
     limit = max(100, min(limit, 20000))
 
@@ -68,6 +72,10 @@ def stats_overview():
                 installs.add(install_id)
     except DefaultCredentialsError:
         return jsonify({"error": "firebase_credentials_missing"}), 503
+    except ValueError:
+        return jsonify({"error": "firebase_query_failed"}), 503
+    except GoogleAPICallError:
+        return jsonify({"error": "firebase_unavailable"}), 503
 
     top_events = sorted(by_event.items(), key=lambda kv: kv[1], reverse=True)[:10]
 

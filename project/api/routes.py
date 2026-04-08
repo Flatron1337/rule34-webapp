@@ -1,28 +1,43 @@
-# project/api/routes.py
 import httpx
 from flask import Blueprint, request, jsonify
 
-api_bp = Blueprint('api', __name__)
+api_bp = Blueprint('api', __name__, url_prefix='/api')
+
 AUTOCOMPLETE_URL = "https://api.rule34.xxx/autocomplete.php"
 
-@api_bp.route('/api/autocomplete')
+@api_bp.route('/autocomplete')
 async def autocomplete():
     """
-    Принимает частичный тег от фронтенда, запрашивает подсказки у API Rule34
-    и возвращает их в формате JSON.
+    Автодополнение тегов для поиска (используется Awesomplete на главной странице)
     """
-    query = request.args.get('q', '')
-    if not query:
+    query = request.args.get('q', '').strip()
+
+    if not query or len(query) < 2:
         return jsonify([])
 
     try:
-        async with httpx.AsyncClient() as client:
-            # API rule34 ожидает параметр 'q' для автодополнения
-            response = await client.get(AUTOCOMPLETE_URL, params={'q': query})
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            response = await client.get(
+                AUTOCOMPLETE_URL,
+                params={'q': query},
+                headers={
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                                  '(KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36'
+                }
+            )
             response.raise_for_status()
-            # API возвращает список объектов, нам нужно только поле 'value'
-            suggestions = [item['value'] for item in response.json()]
-            return jsonify(suggestions)
+            
+            data = response.json()
+            
+            # API возвращает список словарей, нам нужен только 'value'
+            suggestions = [item.get('value') for item in data if isinstance(item, dict) and 'value' in item]
+            
+            return jsonify(suggestions[:15])  # ограничиваем количество подсказок
+
+    except httpx.TimeoutException:
+        return jsonify([])  # тихо падаем, пользователь не должен видеть ошибку
+    except httpx.RequestError:
+        return jsonify([])
     except Exception:
-        # В случае ошибки просто возвращаем пустой список
+        # На всякий случай
         return jsonify([])

@@ -1,23 +1,21 @@
 import os
+import asyncio
 from asgiref.wsgi import WsgiToAsgi
 from project import create_app
-from project.extensions import db
 
-# 1. Создаем Flask приложение
+# Создаём Flask приложение
 flask_app = create_app()
 
-# 2. ВАЖНО: Создаем таблицы БД (favorites) перед запуском
-# Это решает проблему "no such table: favorite"
-with flask_app.app_context():
-    try:
-        db.create_all()
-        print(">>> База данных и таблицы успешно инициализированы.")
-    except Exception as e:
-        print(f">>> Ошибка инициализации БД: {e}")
-
-# 3. Оборачиваем в ASGI для Hypercorn
+# Оборачиваем в ASGI для Hypercorn
 app = WsgiToAsgi(flask_app)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
-    flask_app.run(host='0.0.0.0', port=port, debug=False)
+    print(f">>> Starting Hypercorn on port {port}")
+    # Для локального теста можно использовать uvicorn, но Render использует hypercorn
+    import hypercorn.asyncio
+    from hypercorn.config import Config
+    config = Config()
+    config.bind = [f"0.0.0.0:{port}"]
+    config.use_reloader = False
+    asyncio.run(hypercorn.asyncio.serve(app, config))

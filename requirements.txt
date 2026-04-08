@@ -1,8 +1,9 @@
 flask[async]
 httpx
 python-dotenv
-hypercorn
+hypercorn>=0.18.0
 redis
 flask-caching>=2.1.0
 flask-sqlalchemy
 firebase-admin>=6.5.0
+uvicorn[standard]>=0.30.0   # для локального теста

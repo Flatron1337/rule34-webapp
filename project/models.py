@@ -3,12 +3,12 @@ from .extensions import db
 
 class Favorite(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_ip = db.Column(db.String(45), nullable=False, index=True) # IP v4 или v6
+    user_ip = db.Column(db.String(45), nullable=False, index=True)
     post_id = db.Column(db.Integer, nullable=False)
     file_url = db.Column(db.String(500), nullable=False)
     preview_url = db.Column(db.String(500), nullable=False)
-    tags = db.Column(db.Text, nullable=True) # Храним как строку
-    media_type = db.Column(db.String(10), default='image') # image или video
+    tags = db.Column(db.Text, nullable=True)
+    media_type = db.Column(db.String(10), default='image')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     __table_args__ = (

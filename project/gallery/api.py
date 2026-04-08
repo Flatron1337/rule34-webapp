@@ -7,7 +7,10 @@ from project.extensions import cache
 logger = logging.getLogger(__name__)
 
 API_URL = "https://api.rule34.xxx/index.php"
-HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36'}
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                  '(KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36'
+}
 
 R34_USER_ID = os.getenv("R34_USER_ID")
 R34_API_KEY = os.getenv("R34_API_KEY")
@@ -15,83 +18,94 @@ R34_API_KEY = os.getenv("R34_API_KEY")
 class Rule34Error(Exception):
     pass
 
-def _make_cache_key(tags, page, sort_mode, user_blacklist, limit):
+def _make_cache_key(tags: tuple, page: int, sort_mode: str, user_blacklist: tuple, limit: int) -> str:
     key_parts = [str(tags), str(page), sort_mode, str(user_blacklist), str(limit)]
-    return "view_cache:" + "|".join(key_parts)
+    return f"r34:view:{'|'.join(key_parts)}"
 
-async def get_posts(tags: tuple, page: int, sort_mode: str, user_blacklist: tuple, limit: int) -> list:
-    # 1. Проверяем кэш
+async def get_posts(
+    tags: tuple[str, ...],
+    page: int,
+    sort_mode: str,
+    user_blacklist: tuple[str, ...],
+    limit: int = 20
+) -> list[dict]:
     cache_key = _make_cache_key(tags, page, sort_mode, user_blacklist, limit)
-    cached_data = cache.get(cache_key)
-    if cached_data:
-        return cached_data
-
-    # 2. Подготовка тегов (БЕЗ встроенного черного списка, только пользовательский)
-    negative_tags = [f"-{tag}" for tag in user_blacklist if tag]
     
+    # Проверка кэша
+    cached = cache.get(cache_key)
+    if cached:
+        return cached
+
+    # Подготовка тегов
+    negative_tags = [f"-{tag}" for tag in user_blacklist if tag]
     final_tags = list(tags)
+
     if sort_mode == 'random':
         final_tags.append('sort:random')
-        sort_tag = "" 
     else:
         sort_tag = "sort:score:desc" if sort_mode == 'score' else "sort:id:desc"
+        final_tags.append(sort_tag)
 
     tags_for_api = final_tags + negative_tags
-    if sort_tag: tags_for_api.append(sort_tag)
+    tags_str = " ".join(tags_for_api)
 
-    tags_str_for_api = " ".join(tags_for_api)
-    
     params = {
-        "page": "dapi", "s": "post", "q": "index", "tags": tags_str_for_api,
-        "limit": limit, "pid": page, "json": 1
+        "page": "dapi",
+        "s": "post",
+        "q": "index",
+        "tags": tags_str,
+        "limit": min(limit, 1000),   # hard limit rule34
+        "pid": page,
+        "json": 1
     }
-    
-    if R34_USER_ID: params["user_id"] = R34_USER_ID
-    if R34_API_KEY: params["api_key"] = R34_API_KEY
 
-    # 3. Асинхронный запрос
+    if R34_USER_ID and R34_API_KEY:
+        params["user_id"] = R34_USER_ID
+        params["api_key"] = R34_API_KEY
+
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(API_URL, params=params, headers=HEADERS, timeout=15.0)
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(API_URL, params=params, headers=HEADERS)
             response.raise_for_status()
-            
-            try:
-                data = response.json()
-            except json.JSONDecodeError:
-                if not response.text.strip(): return []
-                raise Rule34Error("Ошибка чтения ответа от API")
+
+            data = response.json()
 
             if not isinstance(data, list):
                 return []
 
-            # 4. Нормализация данных
-            processed_posts = []
+            processed = []
             for post in data:
-                # --- ИСПРАВЛЕНИЕ КАЧЕСТВА ---
-                # sample_url - это картинка среднего размера (не пиксельная).
-                # file_url - оригинал (тяжелый).
-                # preview_url - миниатюра (пиксельная).
-                # Берем sample_url, если есть, иначе file_url.
-                best_preview = post.get("sample_url") or post.get("file_url") or post.get("preview_url")
+                # Лучшее качество превью
+                preview_url = post.get("sample_url") or post.get("preview_url") or post.get("file_url")
                 
-                processed_posts.append({
-                    "id": post.get("id"),
-                    "score": post.get("score"),
+                processed.append({
+                    "id": int(post.get("id", 0)),
+                    "score": int(post.get("score", 0)),
                     "tags": post.get("tags", ""),
-                    "preview_url": best_preview, 
+                    "preview_url": preview_url,
                     "sample_url": post.get("sample_url"),
                     "file_url": post.get("file_url"),
-                    "type": "video" if post.get("file_url", "").endswith((".mp4", ".webm")) else "image",
+                    "type": "video" if str(post.get("file_url", "")).lower().endswith(('.mp4', '.webm')) else "image",
                     "width": post.get("width"),
                     "height": post.get("height")
                 })
 
-            cache.set(cache_key, processed_posts, timeout=300)
-            return processed_posts
+            # Сохраняем в кэш на 5 минут
+            cache.set(cache_key, processed, timeout=300)
+            return processed
 
+    except httpx.TimeoutException:
+        logger.error("Rule34 API timeout")
+        raise Rule34Error("Таймаут соединения с Rule34")
     except httpx.RequestError as e:
         logger.error(f"Network error: {e}")
-        raise Rule34Error("Не удалось соединиться с сервером Rule34")
+        raise Rule34Error("Не удалось подключиться к Rule34")
     except httpx.HTTPStatusError as e:
-        logger.error(f"HTTP error: {e}")
-        raise Rule34Error(f"Ошибка API: {e.response.status_code}")
+        logger.error(f"HTTP {e.response.status_code}: {e.response.text[:200]}")
+        raise Rule34Error(f"Ошибка сервера Rule34: {e.response.status_code}")
+    except json.JSONDecodeError:
+        logger.error("Invalid JSON from Rule34")
+        raise Rule34Error("Некорректный ответ от сервера")
+    except Exception as e:
+        logger.exception("Unexpected error in get_posts")
+        raise Rule34Error(f"Неизвестная ошибка: {str(e)}")

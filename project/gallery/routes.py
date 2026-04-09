@@ -5,7 +5,7 @@ from project.models import Favorite
 from .api import get_posts, Rule34Error   # <-- правильный относительный импорт
 from .api import get_posts, Rule34Error, HEADERS
 
-gallery_bp = Blueprint('gallery', __name__, url_prefix='/gallery')
+gallery_bp = Blueprint('gallery', __name__)
 
 POST_URL_BASE = "https://rule34.xxx/index.php?page=post&s=view&id="
 GALLERY_LIMIT = 20
@@ -71,7 +71,7 @@ async def show_gallery():
     )
 
 # ====================== JSON API ДЛЯ MOBILE ======================
-@gallery_bp.route('/api/mobile')
+@gallery_bp.route('/api/mobile/gallery')
 async def mobile_gallery_api():
     query_tags = request.args.get('tags', '').strip()
     page = max(0, int(request.args.get('page', 0)))

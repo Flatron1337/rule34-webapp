@@ -1,14 +1,11 @@
 import os
-import logging
 from flask import Flask
 from dotenv import load_dotenv
 from .extensions import cache, db
-from .admin.firebase_admin import init_firebase_admin
 
 def create_app():
     load_dotenv()
     app = Flask(__name__)
-    app.logger.setLevel(logging.INFO)
 
     # --- Конфигурация ---
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-key-change-me")
@@ -31,13 +28,8 @@ def create_app():
     # Создаём таблицы
     with app.app_context():
         db.create_all()
-        app.logger.info(">>> Database tables created/verified")
 
-    # Firebase
-    firebase_ready = init_firebase_admin()
-    app.config["FIREBASE_ADMIN_READY"] = firebase_ready
-
-# Регистрация Blueprints
+    # Регистрация Blueprints
     from .main.routes import main_bp
     from .gallery.routes import gallery_bp
     from .api.routes import api_bp
@@ -45,15 +37,4 @@ def create_app():
     app.register_blueprint(main_bp)
     app.register_blueprint(gallery_bp)
     app.register_blueprint(api_bp)
-
-    # Admin blueprint только если файл существует (пока его нет)
-    if firebase_ready:
-        try:
-            from .admin.routes import admin_bp
-            app.register_blueprint(admin_bp)
-            app.logger.info("Admin routes registered")
-        except ImportError:
-            app.logger.info("Admin routes skipped (file not found)")
-
-    app.logger.info(">>> Application created successfully")
     return app

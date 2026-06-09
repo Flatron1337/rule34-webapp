@@ -17,7 +17,7 @@ def get_client_ip():
     return request.remote_addr or "0.0.0.0"
 
 # ====================== HTML ГАЛЕРЕЯ ======================
-@gallery_bp.route('/')
+@gallery_bp.route('/gallery')
 async def show_gallery():
     query_tags = request.args.get('tags', '').strip()
     user_blacklist_str = request.args.get('blacklist', '').strip()

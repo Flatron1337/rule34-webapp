@@ -29,7 +29,9 @@ def create_app():
     cache.init_app(app)
     db.init_app(app)
 
-    # Создаём таблицы
+    # Модели должны быть импортированы до create_all()
+    from . import models  # noqa: F401
+
     with app.app_context():
         db.create_all()
 

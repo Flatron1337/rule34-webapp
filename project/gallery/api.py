@@ -12,8 +12,10 @@ HEADERS = {
                   '(KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36'
 }
 
-R34_USER_ID = os.getenv("R34_USER_ID")
-R34_API_KEY = os.getenv("R34_API_KEY")
+def _r34_credentials() -> tuple[str | None, str | None]:
+    user_id = (os.getenv("R34_USER_ID") or "").strip()
+    api_key = (os.getenv("R34_API_KEY") or "").strip().lstrip("-")
+    return (user_id or None, api_key or None)
 
 class Rule34Error(Exception):
     pass
@@ -62,9 +64,14 @@ async def get_posts(
         "json": 1
     }
 
-    if R34_USER_ID and R34_API_KEY:
-        params["user_id"] = R34_USER_ID
-        params["api_key"] = R34_API_KEY
+    user_id, api_key = _r34_credentials()
+    if not user_id or not api_key:
+        raise Rule34Error(
+            "Rule34 API требует ключи. Задайте R34_USER_ID и R34_API_KEY "
+            "(https://rule34.xxx/index.php?page=account&s=options)"
+        )
+    params["user_id"] = user_id
+    params["api_key"] = api_key
 
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
@@ -76,8 +83,8 @@ async def get_posts(
             if isinstance(data, str):
                 if "authentication" in data.lower():
                     raise Rule34Error(
-                        "Rule34 API требует ключи. Задайте R34_USER_ID и R34_API_KEY "
-                        "(https://rule34.xxx/index.php?page=account&s=options)"
+                        "Rule34 отклонил ключи. Проверьте R34_USER_ID и R34_API_KEY на Render "
+                        "(без лишних символов в начале/конце)"
                     )
                 raise Rule34Error(data)
 

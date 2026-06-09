@@ -145,21 +145,75 @@ def show_favorites():
         user_blacklist=""
     )
 
-# ====================== ПРОКСИ ИЗОБРАЖЕНИЙ ======================
+# ====================== ПРОКСИ МЕДИА ======================
+def _validate_proxy_url(url: str | None) -> str | None:
+    if not url or not url.startswith('http'):
+        return None
+
+    from urllib.parse import urlparse
+    host = (urlparse(url).hostname or '').lower()
+    if not host.endswith('rule34.xxx'):
+        return None
+
+    return url
+
+
+def _proxy_request_headers() -> dict[str, str]:
+    headers = {'User-Agent': HEADERS['User-Agent']}
+    if range_header := request.headers.get('Range'):
+        headers['Range'] = range_header
+    return headers
+
+
 @gallery_bp.route('/proxy/image')
 async def proxy_image():
-    url = request.args.get('url')
-    if not url or not url.startswith('http'):
+    url = _validate_proxy_url(request.args.get('url'))
+    if not url:
         return "Invalid URL", 400
 
-    headers = {'User-Agent': HEADERS['User-Agent']}
+    headers = _proxy_request_headers()
     try:
         async with httpx.AsyncClient() as client:
-            resp = await client.get(url, headers=headers, timeout=10.0)
+            resp = await client.get(url, headers=headers, timeout=30.0, follow_redirects=True)
             resp.raise_for_status()
             return Response(
                 resp.content,
                 content_type=resp.headers.get('content-type', 'image/jpeg')
             )
+    except Exception:
+        return "Proxy error", 502
+
+
+@gallery_bp.route('/proxy/video')
+async def proxy_video():
+    url = _validate_proxy_url(request.args.get('url'))
+    if not url:
+        return "Invalid URL", 400
+
+    headers = _proxy_request_headers()
+    excluded = {'content-encoding', 'content-length', 'transfer-encoding', 'connection'}
+
+    try:
+        async with httpx.AsyncClient() as client:
+            async with client.stream(
+                'GET', url, headers=headers, timeout=120.0, follow_redirects=True
+            ) as resp:
+                resp.raise_for_status()
+
+                response_headers = {
+                    key: value
+                    for key, value in resp.headers.items()
+                    if key.lower() not in excluded
+                }
+
+                async def generate():
+                    async for chunk in resp.aiter_bytes(chunk_size=65536):
+                        yield chunk
+
+                return Response(
+                    generate(),
+                    status=resp.status_code,
+                    headers=response_headers,
+                )
     except Exception:
         return "Proxy error", 502

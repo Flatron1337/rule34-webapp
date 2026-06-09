@@ -31,10 +31,13 @@ async def get_posts(
 ) -> list[dict]:
     cache_key = _make_cache_key(tags, page, sort_mode, user_blacklist, limit)
     
-    # Проверка кэша
-    cached = cache.get(cache_key)
-    if cached:
-        return cached
+    # Проверка кэша (не блокируем поиск при недоступном Redis)
+    try:
+        cached = cache.get(cache_key)
+        if cached:
+            return cached
+    except Exception:
+        logger.warning("Cache read failed", exc_info=True)
 
     # Подготовка тегов
     negative_tags = [f"-{tag}" for tag in user_blacklist if tag]
@@ -70,6 +73,14 @@ async def get_posts(
 
             data = response.json()
 
+            if isinstance(data, str):
+                if "authentication" in data.lower():
+                    raise Rule34Error(
+                        "Rule34 API требует ключи. Задайте R34_USER_ID и R34_API_KEY "
+                        "(https://rule34.xxx/index.php?page=account&s=options)"
+                    )
+                raise Rule34Error(data)
+
             if not isinstance(data, list):
                 return []
 
@@ -90,8 +101,10 @@ async def get_posts(
                     "height": post.get("height")
                 })
 
-            # Сохраняем в кэш на 5 минут
-            cache.set(cache_key, processed, timeout=300)
+            try:
+                cache.set(cache_key, processed, timeout=300)
+            except Exception:
+                logger.warning("Cache write failed", exc_info=True)
             return processed
 
     except httpx.TimeoutException:

@@ -167,7 +167,7 @@ async function handleFav(btn) {
     setTimeout(() => btn.style.transform = "scale(1)", 180);
 
     try {
-        const res = await fetch('/gallery/api/favorite', {
+        const res = await fetch('/api/favorite', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({

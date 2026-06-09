@@ -10,9 +10,13 @@ def create_app():
     # --- Конфигурация ---
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-key-change-me")
     
-    # Redis Cache
-    app.config["CACHE_TYPE"] = "RedisCache"
-    app.config["CACHE_REDIS_URL"] = os.getenv("CACHE_REDIS_URL", "redis://localhost:6379/0")
+    # Cache: Redis в проде, SimpleCache локально без Redis
+    redis_url = os.getenv("CACHE_REDIS_URL")
+    if redis_url:
+        app.config["CACHE_TYPE"] = "RedisCache"
+        app.config["CACHE_REDIS_URL"] = redis_url
+    else:
+        app.config["CACHE_TYPE"] = "SimpleCache"
     app.config["CACHE_DEFAULT_TIMEOUT"] = int(os.getenv("CACHE_TIMEOUT", 300))
 
     # SQLite DB (для Render используем /tmp или instance)

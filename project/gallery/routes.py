@@ -215,28 +215,21 @@ def proxy_video():
 
     try:
         with httpx.Client(follow_redirects=True, timeout=httpx.Timeout(120.0)) as client:
-            upstream = client.build_request(request.method, url, headers=headers)
-            resp = client.send(upstream, stream=(request.method == 'GET'))
+            if request.method == 'HEAD':
+                resp = client.head(url, headers=headers)
+            else:
+                resp = client.get(url, headers=headers)
 
             if resp.status_code >= 400:
-                resp.close()
                 return "Proxy error", 502
 
             response_headers = _filter_proxy_headers(resp.headers)
 
             if request.method == 'HEAD':
-                resp.close()
                 return Response('', status=resp.status_code, headers=response_headers)
 
-            def generate():
-                try:
-                    for chunk in resp.iter_bytes(chunk_size=65536):
-                        yield chunk
-                finally:
-                    resp.close()
-
             return Response(
-                generate(),
+                resp.content,
                 status=resp.status_code,
                 headers=response_headers,
             )

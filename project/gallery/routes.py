@@ -247,31 +247,31 @@ def proxy_image():
         return "Invalid URL", 400
 
     headers = _proxy_request_headers()
+    client = httpx.Client(timeout=30.0, follow_redirects=True)
     try:
-        # Sync-стриминг: WsgiToAsgi обёртка не поддерживает async-генераторы
-        # в Flask Response — Flask-WSGI видит 'function' object is not iterable.
-        with httpx.Client(timeout=30.0, follow_redirects=True) as client:
-            req = client.build_request('GET', url, headers=headers)
-            resp = client.send(req, stream=True)
-            if resp.status_code >= 400:
+        req = client.build_request('GET', url, headers=headers)
+        resp = client.send(req, stream=True)
+        if resp.status_code >= 400:
+            resp.close()
+            return "Proxy error", 502
+        response_headers = _filter_proxy_headers(resp.headers)
+        content_type = resp.headers.get('content-type', 'image/jpeg')
+
+        def generate():
+            try:
+                for chunk in resp.iter_raw():
+                    yield chunk
+            finally:
                 resp.close()
-                return "Proxy error", 502
-            response_headers = _filter_proxy_headers(resp.headers)
-            content_type = resp.headers.get('content-type', 'image/jpeg')
+                client.close()
 
-            def generate():
-                try:
-                    for chunk in resp.iter_raw():
-                        yield chunk
-                finally:
-                    resp.close()
-
-            return Response(
-                stream_with_context(generate()),
-                content_type=content_type,
-                headers=response_headers,
-            )
+        return Response(
+            stream_with_context(generate()),
+            content_type=content_type,
+            headers=response_headers,
+        )
     except Exception:
+        client.close()
         logger.warning("proxy_image failed", exc_info=True)
         return "Proxy error", 502
 
@@ -283,37 +283,36 @@ def proxy_video():
         return "Invalid URL", 400
 
     headers = _proxy_request_headers()
-
+    client = httpx.Client(timeout=httpx.Timeout(120.0), follow_redirects=True)
     try:
-        # Sync-стриминг: async def generate() не работает через WsgiToAsgi,
-        # поэтому используем sync httpx.Client (как было изначально).
-        with httpx.Client(timeout=httpx.Timeout(120.0), follow_redirects=True) as client:
-            method = 'HEAD' if request.method == 'HEAD' else 'GET'
-            req = client.build_request(method, url, headers=headers)
-            resp = client.send(req, stream=True)
+        method = 'HEAD' if request.method == 'HEAD' else 'GET'
+        req = client.build_request(method, url, headers=headers)
+        resp = client.send(req, stream=True)
 
-            if resp.status_code >= 400:
+        if resp.status_code >= 400:
+            resp.close()
+            return "Proxy error", 502
+
+        response_headers = _filter_proxy_headers(resp.headers)
+
+        if request.method == 'HEAD':
+            resp.close()
+            return Response('', status=resp.status_code, headers=response_headers)
+
+        def generate():
+            try:
+                for chunk in resp.iter_raw():
+                    yield chunk
+            finally:
                 resp.close()
-                return "Proxy error", 502
+                client.close()
 
-            response_headers = _filter_proxy_headers(resp.headers)
-
-            if request.method == 'HEAD':
-                resp.close()
-                return Response('', status=resp.status_code, headers=response_headers)
-
-            def generate():
-                try:
-                    for chunk in resp.iter_raw():
-                        yield chunk
-                finally:
-                    resp.close()
-
-            return Response(
-                stream_with_context(generate()),
-                status=resp.status_code,
-                headers=response_headers,
-            )
+        return Response(
+            stream_with_context(generate()),
+            status=resp.status_code,
+            headers=response_headers,
+        )
     except Exception:
+        client.close()
         logger.warning("proxy_video failed", exc_info=True)
         return "Proxy error", 502

@@ -20,6 +20,11 @@ def create_app():
     app.config["CACHE_DEFAULT_TIMEOUT"] = int(os.getenv("CACHE_TIMEOUT", 300))
 
     # SQLite DB (для Render используем /tmp или instance)
+    #
+    # TODO(потеря данных): у Render эфемерный диск — favorites.db стирается при
+    # каждом деплое/рестарте, поэтому избранное веб-версии не переживает редеплой.
+    # Миграция на Render Disk или Postgres отложена. Мобильное приложение хранит
+    # избранное локально на устройстве (sqflite) и этой проблемы не касается.
     instance_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "../instance")
     os.makedirs(instance_path, exist_ok=True)
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{os.path.join(instance_path, 'favorites.db')}"

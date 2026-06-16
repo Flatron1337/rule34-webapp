@@ -1,27 +1,61 @@
+import logging
+
 import httpx
-from flask import Blueprint, render_template, request, session, redirect, url_for, flash, Response, jsonify
+from flask import (
+    Blueprint, render_template, request, session, redirect, url_for,
+    flash, Response, jsonify, stream_with_context,
+)
 from project.extensions import db
 from project.models import Favorite
-from .api import get_posts, Rule34Error   # <-- правильный относительный импорт
-from .api import get_posts, Rule34Error, HEADERS
+from .api import get_posts, Rule34Error, HEADERS, _media_type
+
+logger = logging.getLogger(__name__)
 
 gallery_bp = Blueprint('gallery', __name__)
 
 POST_URL_BASE = "https://rule34.xxx/index.php?page=post&s=view&id="
 GALLERY_LIMIT = 20
 
+
+def _parse_page(raw, default: int = 0) -> int:
+    """Безопасный парсинг номера страницы. Возвращает default при
+    отсутствии/нечисловом значении, отсекает отрицательные."""
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return default
+    return max(0, value)
+
 def get_client_ip():
-    """Получаем реальный IP даже через прокси (Render)"""
+    """
+    Реальный IP клиента даже через прокси/балансировщик Render.
+
+    Безопасность: НЕ используем первый X-Forwarded-For — его можно подделать,
+    добавив произвольное значение слева (client-controlled), что позволило бы
+    читать/удалять чужие избранное по подменному IP (IDOR).
+
+    Приоритет:
+      1. X-Real-IP — ставится доверенным балансировщиком Render, не подделывается клиентом.
+      2. request.remote_addr — IP прямого TCP-соединения (надёжный фолбэк).
+      3. правый край X-Forwarded-For — последний хоп (ближайший доверенный прокси).
+    """
+    real_ip = request.headers.get("X-Real-IP")
+    if real_ip:
+        return real_ip.strip()
+    if request.remote_addr:
+        return request.remote_addr
     if forwarded := request.headers.getlist("X-Forwarded-For"):
-        return forwarded[0].split(',')[0].strip()
-    return request.remote_addr or "0.0.0.0"
+        # Берём ПРАВЫЙ край — это последний доверенный прокси перед нами.
+        last_hop = forwarded[0].split(",")[-1].strip()
+        return last_hop
+    return "0.0.0.0"
 
 # ====================== HTML ГАЛЕРЕЯ ======================
 @gallery_bp.route('/gallery')
 async def show_gallery():
     query_tags = request.args.get('tags', '').strip()
     user_blacklist_str = request.args.get('blacklist', '').strip()
-    page = max(0, int(request.args.get('page', 0)))
+    page = _parse_page(request.args.get('page', 0))
     sort_mode = request.args.get('sort', 'date')
 
     if not query_tags and sort_mode != 'random':
@@ -74,7 +108,7 @@ async def show_gallery():
 @gallery_bp.route('/api/mobile/gallery')
 async def mobile_gallery_api():
     query_tags = request.args.get('tags', '').strip()
-    page = max(0, int(request.args.get('page', 0)))
+    page = _parse_page(request.args.get('page', 0))
     sort_mode = request.args.get('sort', 'date')
 
     tags_tuple = tuple(query_tags.split()) if query_tags else ()
@@ -82,16 +116,35 @@ async def mobile_gallery_api():
     try:
         posts = await get_posts(tags_tuple, page, sort_mode, (), 20)
         return jsonify(posts)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Rule34Error as e:
+        # Ошибка вышестоящего Rule34 API — 502 Bad Gateway.
+        return jsonify({"error": str(e)}), 502
+    except Exception:
+        # Не утекаем внутренние детали (пути, traceback) наружу; пишем в лог.
+        logger.exception("mobile_gallery_api failed")
+        return jsonify({"error": "Internal server error"}), 500
 
 # ====================== FAVORITES ======================
 @gallery_bp.route('/api/favorite', methods=['POST'])
 def toggle_favorite():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"status": "error", "message": "Invalid JSON body"}), 400
+
+    raw_id = data.get('post_id')
     try:
-        data = request.get_json()
+        post_id = int(raw_id)
+    except (TypeError, ValueError):
+        return jsonify({"status": "error", "message": "post_id must be an integer"}), 400
+
+    # file_url — NOT NULL в модели Favorite; без проверки пустое значение
+    # приводило бы к IntegrityError на commit → 500 вместо осмысленной 400.
+    file_url = data.get('file_url')
+    if not file_url or not isinstance(file_url, str):
+        return jsonify({"status": "error", "message": "file_url is required"}), 400
+
+    try:
         user_ip = get_client_ip()
-        post_id = int(data.get('post_id'))
 
         existing = Favorite.query.filter_by(user_ip=user_ip, post_id=post_id).first()
 
@@ -102,10 +155,10 @@ def toggle_favorite():
             new_fav = Favorite(
                 user_ip=user_ip,
                 post_id=post_id,
-                file_url=data.get('file_url'),
+                file_url=file_url,
                 preview_url=data.get('preview_url'),
                 tags=data.get('tags'),
-                media_type=data.get('media_type', 'image')
+                media_type=data.get('media_type') or _media_type(file_url),
             )
             db.session.add(new_fav)
             action = 'added'
@@ -113,9 +166,10 @@ def toggle_favorite():
         db.session.commit()
         return jsonify({"status": "success", "action": action})
 
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        return jsonify({"status": "error", "message": str(e)}), 500
+        logger.exception("toggle_favorite failed")
+        return jsonify({"status": "error", "message": "Internal server error"}), 500
 
 @gallery_bp.route('/favorites')
 def show_favorites():
@@ -194,19 +248,36 @@ async def proxy_image():
 
     headers = _proxy_request_headers()
     try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(url, headers=headers, timeout=30.0, follow_redirects=True)
-            resp.raise_for_status()
+        # Стримим чанками вместо resp.content (не грузим всё изображение в память).
+        # Фильтруем hop-by-hop заголовки как в proxy_video — единообразно.
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            req = client.build_request('GET', url, headers=headers)
+            resp = await client.send(req, stream=True)
+            if resp.status_code >= 400:
+                await resp.aclose()
+                return "Proxy error", 502
+            response_headers = _filter_proxy_headers(resp.headers)
+            content_type = resp.headers.get('content-type', 'image/jpeg')
+
+            async def generate():
+                try:
+                    async for chunk in resp.aiter_raw():
+                        yield chunk
+                finally:
+                    await resp.aclose()
+
             return Response(
-                resp.content,
-                content_type=resp.headers.get('content-type', 'image/jpeg')
+                stream_with_context(generate()),
+                content_type=content_type,
+                headers=response_headers,
             )
     except Exception:
+        logger.warning("proxy_image failed", exc_info=True)
         return "Proxy error", 502
 
 
 @gallery_bp.route('/proxy/video', methods=['GET', 'HEAD'])
-def proxy_video():
+async def proxy_video():
     url = _validate_proxy_url(request.args.get('url'))
     if not url:
         return "Invalid URL", 400
@@ -214,24 +285,35 @@ def proxy_video():
     headers = _proxy_request_headers()
 
     try:
-        with httpx.Client(follow_redirects=True, timeout=httpx.Timeout(120.0)) as client:
-            if request.method == 'HEAD':
-                resp = client.head(url, headers=headers)
-            else:
-                resp = client.get(url, headers=headers)
+        # Async + стриминг: ранее был sync httpx.Client, который блокировал
+        # воркер ASGI-пула до 120с на каждый запрос видео.
+        async with httpx.AsyncClient(timeout=httpx.Timeout(120.0), follow_redirects=True) as client:
+            method = 'HEAD' if request.method == 'HEAD' else 'GET'
+            req = client.build_request(method, url, headers=headers)
+            resp = await client.send(req, stream=True)
 
             if resp.status_code >= 400:
+                await resp.aclose()
                 return "Proxy error", 502
 
             response_headers = _filter_proxy_headers(resp.headers)
 
             if request.method == 'HEAD':
+                await resp.aclose()
                 return Response('', status=resp.status_code, headers=response_headers)
 
+            async def generate():
+                try:
+                    async for chunk in resp.aiter_raw():
+                        yield chunk
+                finally:
+                    await resp.aclose()
+
             return Response(
-                resp.content,
+                stream_with_context(generate()),
                 status=resp.status_code,
                 headers=response_headers,
             )
     except Exception:
+        logger.warning("proxy_video failed", exc_info=True)
         return "Proxy error", 502

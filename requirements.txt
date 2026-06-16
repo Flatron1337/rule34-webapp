@@ -1,9 +1,9 @@
-flask[async]
-httpx
-python-dotenv
-hypercorn>=0.18.0
-redis
-flask-caching>=2.1.0
-flask-sqlalchemy
-firebase-admin>=6.5.0
-uvicorn[standard]>=0.30.0   # для локального теста
+# Зависимости продакшена. Версии зафиксированы с верхней границей по major,
+# чтобы внезапный breaking-change апстрима не сломал деплой на Render.
+flask[async]>=3.0,<4.0
+httpx>=0.27,<1.0
+python-dotenv>=1.0,<2.0
+hypercorn>=0.18.0,<1.0
+redis>=5.0,<6.0
+flask-caching>=2.1.0,<3.0
+flask-sqlalchemy>=3.1,<4.0

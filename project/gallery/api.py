@@ -20,6 +20,19 @@ def _r34_credentials() -> tuple[str | None, str | None]:
 class Rule34Error(Exception):
     pass
 
+
+def _media_type(file_url: str) -> str:
+    """Определяет тип медиа по URL. Контракт с Flutter-клиентом (post.dart):
+    ожидает 'video' / 'gif' / 'image'. Раньше gif не обрабатывался и
+    отображался как статичная картинка."""
+    u = (file_url or "").lower()
+    if u.endswith(('.mp4', '.webm')):
+        return 'video'
+    if u.endswith('.gif'):
+        return 'gif'
+    return 'image'
+
+
 def _make_cache_key(tags: tuple, page: int, sort_mode: str, user_blacklist: tuple, limit: int) -> str:
     key_parts = [str(tags), str(page), sort_mode, str(user_blacklist), str(limit)]
     return f"r34:view:{'|'.join(key_parts)}"
@@ -103,7 +116,7 @@ async def get_posts(
                     "preview_url": preview_url,
                     "sample_url": post.get("sample_url"),
                     "file_url": post.get("file_url"),
-                    "type": "video" if str(post.get("file_url", "")).lower().endswith(('.mp4', '.webm')) else "image",
+                    "type": _media_type(post.get("file_url", "")),
                     "width": post.get("width"),
                     "height": post.get("height")
                 })

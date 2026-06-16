@@ -241,30 +241,30 @@ def _filter_proxy_headers(headers) -> dict[str, str]:
 
 
 @gallery_bp.route('/proxy/image')
-async def proxy_image():
+def proxy_image():
     url = _validate_proxy_url(request.args.get('url'))
     if not url:
         return "Invalid URL", 400
 
     headers = _proxy_request_headers()
     try:
-        # Стримим чанками вместо resp.content (не грузим всё изображение в память).
-        # Фильтруем hop-by-hop заголовки как в proxy_video — единообразно.
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+        # Sync-стриминг: WsgiToAsgi обёртка не поддерживает async-генераторы
+        # в Flask Response — Flask-WSGI видит 'function' object is not iterable.
+        with httpx.Client(timeout=30.0, follow_redirects=True) as client:
             req = client.build_request('GET', url, headers=headers)
-            resp = await client.send(req, stream=True)
+            resp = client.send(req, stream=True)
             if resp.status_code >= 400:
-                await resp.aclose()
+                resp.close()
                 return "Proxy error", 502
             response_headers = _filter_proxy_headers(resp.headers)
             content_type = resp.headers.get('content-type', 'image/jpeg')
 
-            async def generate():
+            def generate():
                 try:
-                    async for chunk in resp.aiter_raw():
+                    for chunk in resp.iter_raw():
                         yield chunk
                 finally:
-                    await resp.aclose()
+                    resp.close()
 
             return Response(
                 stream_with_context(generate()),
@@ -277,7 +277,7 @@ async def proxy_image():
 
 
 @gallery_bp.route('/proxy/video', methods=['GET', 'HEAD'])
-async def proxy_video():
+def proxy_video():
     url = _validate_proxy_url(request.args.get('url'))
     if not url:
         return "Invalid URL", 400
@@ -285,29 +285,29 @@ async def proxy_video():
     headers = _proxy_request_headers()
 
     try:
-        # Async + стриминг: ранее был sync httpx.Client, который блокировал
-        # воркер ASGI-пула до 120с на каждый запрос видео.
-        async with httpx.AsyncClient(timeout=httpx.Timeout(120.0), follow_redirects=True) as client:
+        # Sync-стриминг: async def generate() не работает через WsgiToAsgi,
+        # поэтому используем sync httpx.Client (как было изначально).
+        with httpx.Client(timeout=httpx.Timeout(120.0), follow_redirects=True) as client:
             method = 'HEAD' if request.method == 'HEAD' else 'GET'
             req = client.build_request(method, url, headers=headers)
-            resp = await client.send(req, stream=True)
+            resp = client.send(req, stream=True)
 
             if resp.status_code >= 400:
-                await resp.aclose()
+                resp.close()
                 return "Proxy error", 502
 
             response_headers = _filter_proxy_headers(resp.headers)
 
             if request.method == 'HEAD':
-                await resp.aclose()
+                resp.close()
                 return Response('', status=resp.status_code, headers=response_headers)
 
-            async def generate():
+            def generate():
                 try:
-                    async for chunk in resp.aiter_raw():
+                    for chunk in resp.iter_raw():
                         yield chunk
                 finally:
-                    await resp.aclose()
+                    resp.close()
 
             return Response(
                 stream_with_context(generate()),

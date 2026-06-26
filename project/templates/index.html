@@ -2,17 +2,51 @@
 {% block title %}Поиск Rule34{% endblock %}
 
 {% block content %}
+<style>
+    .input-glass {
+        background: rgba(15, 23, 42, 0.5) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        color: white !important;
+        transition: all 0.3s ease;
+    }
+    .input-glass:focus {
+        background: rgba(15, 23, 42, 0.8) !important;
+        border-color: #a855f7 !important;
+        box-shadow: 0 0 0 0.25rem rgba(168, 85, 247, 0.25) !important;
+    }
+    .badge-hover {
+        transition: all 0.2s ease;
+        background: rgba(255, 255, 255, 0.1) !important;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        color: #e2e8f0;
+    }
+    .badge-hover:hover {
+        background: var(--primary-gradient) !important;
+        transform: translateY(-2px);
+        color: white;
+    }
+    .btn-outline-glass {
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: white;
+        background: transparent;
+        transition: all 0.3s ease;
+    }
+    .btn-outline-glass:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+    }
+</style>
 <div class="row justify-content-center mt-5">
     <div class="col-lg-8">
-        <div class="card bg-dark text-white shadow-lg border-secondary">
+        <div class="card glass-panel border-0 text-white">
             <div class="card-body p-5 text-center">
-                <h1 class="display-4 mb-4 fw-bold">R34 <span class="text-primary">Search</span></h1>
+                <h1 class="display-4 mb-4 fw-bold">R34 <span class="text-gradient">Search</span></h1>
 
                 <form action="{{ url_for('gallery.show_gallery') }}" method="get">
                     <div class="mb-3 text-start">
                         <label class="form-label text-muted">Поиск (теги через пробел)</label>
                         <input type="text"
-                            class="form-control form-control-lg awesomplete-input bg-dark text-white border-secondary"
+                            class="form-control form-control-lg awesomplete-input input-glass"
                             name="tags" placeholder="genshin_impact yelan" autofocus required>
                     </div>
 
@@ -26,7 +60,7 @@
                             </h2>
                             <div id="collapseOpt" class="accordion-collapse collapse" data-bs-parent="#advSearch">
                                 <div class="accordion-body px-0">
-                                    <input type="text" class="form-control bg-dark text-white border-secondary"
+                                    <input type="text" class="form-control input-glass"
                                         name="blacklist" placeholder="tags to exclude">
                                 </div>
                             </div>
@@ -34,9 +68,8 @@
                     </div>
 
                     <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
-                        <button type="submit" class="btn btn-primary btn-lg px-5">🔍 Искать</button>
-                        <a href="{{ url_for('main.random_post') }}" class="btn btn-outline-light btn-lg px-4">🎲
-                            Random</a>
+                        <button type="submit" class="btn btn-primary-gradient btn-lg px-5 rounded-pill">🔍 Искать</button>
+                        <a href="{{ url_for('main.random_post') }}" class="btn btn-outline-glass btn-lg px-4 rounded-pill">🎲 Random</a>
                     </div>
                 </form>
 
@@ -45,7 +78,7 @@
                     <small class="text-muted d-block mb-2">Недавние:</small>
                     {% for item in history %}
                     <a href="{{ url_for('gallery.show_gallery', tags=item) }}"
-                        class="badge bg-secondary text-decoration-none me-1">{{ item }}</a>
+                        class="badge badge-hover text-decoration-none me-1 mb-1 px-3 py-2 rounded-pill">{{ item }}</a>
                     {% endfor %}
                 </div>
                 {% endif %}

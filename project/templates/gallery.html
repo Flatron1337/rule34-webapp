@@ -2,23 +2,69 @@
 {% block title %}{{ tags or ("Избранное" if is_favorites else "Галерея") }}{% endblock %}
 
 {% block content %}
+<style>
+    .btn-outline-glass {
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: white;
+        background: rgba(30, 41, 59, 0.4);
+        transition: all 0.3s ease;
+    }
+    .btn-outline-glass:hover, .btn-outline-glass.active {
+        background: var(--primary-gradient);
+        color: white;
+        border-color: transparent;
+    }
+    .page-link {
+        background: rgba(30, 41, 59, 0.6) !important;
+        border-color: rgba(255, 255, 255, 0.1) !important;
+        color: white !important;
+    }
+    .page-link:hover {
+        background: var(--primary-gradient) !important;
+        color: white !important;
+        border-color: transparent !important;
+    }
+    .page-item.disabled .page-link {
+        background: rgba(30, 41, 59, 0.2) !important;
+        color: rgba(255, 255, 255, 0.3) !important;
+    }
+    .modal-content.glass-modal {
+        background: rgba(15, 23, 42, 0.85) !important;
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 20px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+    .btn-success-gradient {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        border: none;
+        color: white;
+        transition: all 0.3s ease;
+    }
+    .btn-success-gradient:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+        color: white;
+    }
+</style>
 <div class="text-center mb-4">
     <h3 class="fw-bold">
         {% if is_favorites %}
             ❤️ Моё избранное
         {% else %}
-            Результаты: <span class="text-primary">{{ tags or "Random" }}</span>
+            Результаты: <span class="text-gradient">{{ tags or "Random" }}</span>
         {% endif %}
     </h3>
 
     {% if not is_favorites %}
     <div class="btn-group mt-3">
         <a href="{{ url_for('gallery.show_gallery', tags=tags, blacklist=user_blacklist, page=0, sort='score') }}" 
-           class="btn btn-sm btn-outline-light {% if sort_mode == 'score' %}active{% endif %}">
+           class="btn btn-sm btn-outline-glass px-3 rounded-pill {% if sort_mode == 'score' %}active{% endif %}">
            🌟 По рейтингу
         </a>
         <a href="{{ url_for('gallery.show_gallery', tags=tags, blacklist=user_blacklist, page=0, sort='date') }}" 
-           class="btn btn-sm btn-outline-light {% if sort_mode == 'date' %}active{% endif %}">
+           class="btn btn-sm btn-outline-glass px-3 rounded-pill {% if sort_mode == 'date' %}active{% endif %}">
            📅 По дате
         </a>
     </div>
@@ -28,7 +74,7 @@
 {% if posts %}
     <div class="masonry-grid">
         {% for post in posts %}
-        <div class="masonry-item card bg-dark border-0 shadow-sm">
+        <div class="masonry-item glass-panel p-2 border-0">
             <button class="fav-btn {% if post.id in fav_ids %}active{% endif %}" 
                     type="button"
                     onclick="handleFav(this)"
@@ -108,14 +154,16 @@
 <!-- Lightbox -->
 <div class="modal fade" id="lightboxModal" tabindex="-1">
     <div class="modal-dialog modal-xl modal-dialog-centered">
-        <div class="modal-content bg-dark text-white">
+        <div class="modal-content glass-modal text-white">
             <div class="modal-header border-0">
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-0 text-center bg-black" id="lightbox-content" style="min-height: 400px;"></div>
+            <div class="modal-body p-0 text-center" id="lightbox-content" style="min-height: 400px; display: flex; justify-content: center; align-items: center;"></div>
             <div class="modal-footer border-0 d-block">
                 <div id="lightbox-tags" class="d-flex flex-wrap justify-content-center gap-2 mb-3"></div>
-                <a href="#" id="lightbox-dl" class="btn btn-success" target="_blank" download>Скачать оригинал</a>
+                <div class="d-flex justify-content-center">
+                    <a href="#" id="lightbox-dl" class="btn btn-success-gradient rounded-pill px-4 py-2" target="_blank" download>Скачать оригинал</a>
+                </div>
             </div>
         </div>
     </div>
@@ -146,7 +194,9 @@ function handleLightbox(el) {
         tagsStr.split(' ').forEach(tag => {
             if (!tag) return;
             const a = document.createElement('a');
-            a.className = 'badge bg-primary text-decoration-none px-3 py-1';
+            a.className = 'badge text-decoration-none px-3 py-1 rounded-pill';
+            a.style.background = 'var(--primary-gradient)';
+            a.style.color = 'white';
             a.textContent = tag;
             a.href = `/gallery/?tags=${encodeURIComponent(tag)}`;
             tagsContainer.appendChild(a);

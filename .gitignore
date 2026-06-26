@@ -9,3 +9,6 @@ __pycache__/
 # Secrets and logs
 .env
 *.log
+
+*.mp4
+*.mkv

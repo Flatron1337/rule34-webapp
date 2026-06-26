@@ -246,5 +246,14 @@ async function handleFav(btn) {
         console.error(e);
     }
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    const lightboxModal = document.getElementById('lightboxModal');
+    if (lightboxModal) {
+        lightboxModal.addEventListener('hidden.bs.modal', function () {
+            document.getElementById('lightbox-content').innerHTML = '';
+        });
+    }
+});
 </script>
 {% endblock %}

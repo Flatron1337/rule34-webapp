@@ -58,7 +58,7 @@ async def show_gallery():
     page = _parse_page(request.args.get('page', 0))
     sort_mode = request.args.get('sort', 'date')
 
-    if not query_tags and sort_mode != 'random':
+    if not query_tags and sort_mode not in ('random', 'score', 'date'):
         return redirect(url_for('main.index'))
 
     # История поиска

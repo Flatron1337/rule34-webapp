@@ -87,24 +87,26 @@
             </button>
 
             {% if post.type == 'video' %}
-                <img src="{{ post.preview_url or post.sample_url }}" 
+                <img src="{{ url_for('gallery.proxy_image', url=post.preview_url or post.sample_url) }}" 
                      class="post-media" 
                      loading="lazy"
                      alt="Video"
                      onclick="handleLightbox(this)"
-                     data-file="{{ post.file_url }}"
+                     data-file="{{ url_for('gallery.proxy_video', url=post.file_url) }}"
+                     data-orig-file="{{ post.file_url }}"
                      data-type="video"
                      data-tags="{{ post.tags }}">
                 <div class="position-absolute bottom-0 start-0 p-2 text-white bg-dark bg-opacity-75 rounded-end">
                     <i class="fas fa-video"></i>
                 </div>
             {% else %}
-                <img src="{{ post.preview_url or post.sample_url }}" 
+                <img src="{{ url_for('gallery.proxy_image', url=post.preview_url or post.sample_url) }}" 
                      class="post-media" 
                      loading="lazy"
                      alt="Image"
                      onclick="handleLightbox(this)"
-                     data-file="{{ post.file_url }}"
+                     data-file="{{ url_for('gallery.proxy_image', url=post.file_url) }}"
+                     data-orig-file="{{ post.file_url }}"
                      data-type="image"
                      data-tags="{{ post.tags }}">
             {% endif %}

@@ -247,7 +247,7 @@ def proxy_image():
         return "Invalid URL", 400
 
     headers = _proxy_request_headers()
-    client = httpx.Client(timeout=30.0, follow_redirects=True)
+    client = httpx.Client(timeout=30.0, follow_redirects=True, trust_env=False)
     try:
         req = client.build_request('GET', url, headers=headers)
         resp = client.send(req, stream=True)
@@ -283,7 +283,7 @@ def proxy_video():
         return "Invalid URL", 400
 
     headers = _proxy_request_headers()
-    client = httpx.Client(timeout=httpx.Timeout(120.0), follow_redirects=True)
+    client = httpx.Client(timeout=httpx.Timeout(120.0), follow_redirects=True, trust_env=False)
     try:
         method = 'HEAD' if request.method == 'HEAD' else 'GET'
         req = client.build_request(method, url, headers=headers)

@@ -1,4 +1,4 @@
 # Dev-зависимости. Ставить отдельно: pip install -r requirements-dev.txt
 -r requirements.txt
 
-uvicorn[standard]>=0.30.0,<1.0   # для локального теста (на проде используется hypercorn)
+uvicorn[standard]>=0.49.0,<1.0   # для локального теста (на проде используется hypercorn)

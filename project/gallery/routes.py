@@ -2,8 +2,16 @@ import logging
 
 import httpx
 from flask import (
-    Blueprint, render_template, request, session, redirect, url_for,
-    flash, Response, jsonify, stream_with_context,
+    Blueprint,
+    render_template,
+    request,
+    session,
+    redirect,
+    url_for,
+    flash,
+    Response,
+    jsonify,
+    stream_with_context,
 )
 from project.extensions import db
 from project.models import Favorite
@@ -11,7 +19,7 @@ from .api import get_posts, Rule34Error, HEADERS, _media_type
 
 logger = logging.getLogger(__name__)
 
-gallery_bp = Blueprint('gallery', __name__)
+gallery_bp = Blueprint("gallery", __name__)
 
 POST_URL_BASE = "https://rule34.xxx/index.php?page=post&s=view&id="
 GALLERY_LIMIT = 20
@@ -25,6 +33,7 @@ def _parse_page(raw, default: int = 0) -> int:
     except (TypeError, ValueError):
         return default
     return max(0, value)
+
 
 def get_client_ip():
     """
@@ -50,24 +59,24 @@ def get_client_ip():
         return last_hop
     return "0.0.0.0"
 
-# ====================== HTML ГАЛЕРЕЯ ======================
-@gallery_bp.route('/gallery')
-async def show_gallery():
-    query_tags = request.args.get('tags', '').strip()
-    user_blacklist_str = request.args.get('blacklist', '').strip()
-    page = _parse_page(request.args.get('page', 0))
-    sort_mode = request.args.get('sort', 'date')
 
-    if not query_tags and sort_mode not in ('random', 'score', 'date'):
-        return redirect(url_for('main.index'))
+@gallery_bp.route("/gallery")
+async def show_gallery():
+    query_tags = request.args.get("tags", "").strip()
+    user_blacklist_str = request.args.get("blacklist", "").strip()
+    page = _parse_page(request.args.get("page", 0))
+    sort_mode = request.args.get("sort", "date")
+
+    if not query_tags and sort_mode not in ("random", "score", "date"):
+        return redirect(url_for("main.index"))
 
     # История поиска
     if query_tags:
-        history = session.get('history', [])
+        history = session.get("history", [])
         if query_tags in history:
             history.remove(query_tags)
         history.insert(0, query_tags)
-        session['history'] = history[:10]
+        session["history"] = history[:10]
 
     tags_tuple = tuple(query_tags.split()) if query_tags else ()
     blacklist_tuple = tuple(user_blacklist_str.split()) if user_blacklist_str else ()
@@ -76,7 +85,9 @@ async def show_gallery():
     error_msg = None
 
     try:
-        posts = await get_posts(tags_tuple, page, sort_mode, blacklist_tuple, GALLERY_LIMIT)
+        posts = await get_posts(
+            tags_tuple, page, sort_mode, blacklist_tuple, GALLERY_LIMIT
+        )
     except Rule34Error as e:
         error_msg = str(e)
         flash(error_msg, "danger")
@@ -85,13 +96,17 @@ async def show_gallery():
     user_ip = get_client_ip()
     fav_ids = []
     try:
-        favs = Favorite.query.filter_by(user_ip=user_ip).with_entities(Favorite.post_id).all()
+        favs = (
+            Favorite.query.filter_by(user_ip=user_ip)
+            .with_entities(Favorite.post_id)
+            .all()
+        )
         fav_ids = [f.post_id for f in favs]
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to fetch favorites: %s", e)
 
     return render_template(
-        'gallery.html',
+        "gallery.html",
         posts=posts,
         page=page,
         tags=query_tags,
@@ -101,15 +116,15 @@ async def show_gallery():
         user_blacklist=user_blacklist_str,
         fav_ids=fav_ids,
         error=error_msg,
-        is_favorites=False
+        is_favorites=False,
     )
 
-# ====================== JSON API ДЛЯ MOBILE ======================
-@gallery_bp.route('/api/mobile/gallery')
+
+@gallery_bp.route("/api/mobile/gallery")
 async def mobile_gallery_api():
-    query_tags = request.args.get('tags', '').strip()
-    page = _parse_page(request.args.get('page', 0))
-    sort_mode = request.args.get('sort', 'date')
+    query_tags = request.args.get("tags", "").strip()
+    page = _parse_page(request.args.get("page", 0))
+    sort_mode = request.args.get("sort", "date")
 
     tags_tuple = tuple(query_tags.split()) if query_tags else ()
 
@@ -124,22 +139,24 @@ async def mobile_gallery_api():
         logger.exception("mobile_gallery_api failed")
         return jsonify({"error": "Internal server error"}), 500
 
-# ====================== FAVORITES ======================
-@gallery_bp.route('/api/favorite', methods=['POST'])
+
+@gallery_bp.route("/api/favorite", methods=["POST"])
 def toggle_favorite():
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return jsonify({"status": "error", "message": "Invalid JSON body"}), 400
 
-    raw_id = data.get('post_id')
+    raw_id = data.get("post_id")
     try:
         post_id = int(raw_id)
     except (TypeError, ValueError):
-        return jsonify({"status": "error", "message": "post_id must be an integer"}), 400
+        return jsonify(
+            {"status": "error", "message": "post_id must be an integer"}
+        ), 400
 
     # file_url — NOT NULL в модели Favorite; без проверки пустое значение
     # приводило бы к IntegrityError на commit → 500 вместо осмысленной 400.
-    file_url = data.get('file_url')
+    file_url = data.get("file_url")
     if not file_url or not isinstance(file_url, str):
         return jsonify({"status": "error", "message": "file_url is required"}), 400
 
@@ -150,18 +167,18 @@ def toggle_favorite():
 
         if existing:
             db.session.delete(existing)
-            action = 'removed'
+            action = "removed"
         else:
             new_fav = Favorite(
                 user_ip=user_ip,
                 post_id=post_id,
                 file_url=file_url,
-                preview_url=data.get('preview_url'),
-                tags=data.get('tags'),
-                media_type=data.get('media_type') or _media_type(file_url),
+                preview_url=data.get("preview_url"),
+                tags=data.get("tags"),
+                media_type=data.get("media_type") or _media_type(file_url),
             )
             db.session.add(new_fav)
-            action = 'added'
+            action = "added"
 
         db.session.commit()
         return jsonify({"status": "success", "action": action})
@@ -171,64 +188,71 @@ def toggle_favorite():
         logger.exception("toggle_favorite failed")
         return jsonify({"status": "error", "message": "Internal server error"}), 500
 
-@gallery_bp.route('/favorites')
+
+@gallery_bp.route("/favorites")
 def show_favorites():
     user_ip = get_client_ip()
-    favorites = Favorite.query.filter_by(user_ip=user_ip)\
-        .order_by(Favorite.created_at.desc()).all()
+    favorites = (
+        Favorite.query.filter_by(user_ip=user_ip)
+        .order_by(Favorite.created_at.desc())
+        .all()
+    )
 
     posts = [
         {
-            'id': f.post_id,
-            'file_url': f.file_url,
-            'preview_url': f.preview_url,
-            'type': f.media_type,
-            'tags': f.tags or ''
+            "id": f.post_id,
+            "file_url": f.file_url,
+            "preview_url": f.preview_url,
+            "type": f.media_type,
+            "tags": f.tags or "",
         }
         for f in favorites
     ]
 
     return render_template(
-        'gallery.html',
+        "gallery.html",
         posts=posts,
         tags="",
         sort_mode="date",
         page=-1,
-        fav_ids=[p['id'] for p in posts],
+        fav_ids=[p["id"] for p in posts],
         is_favorites=True,
-        user_blacklist=""
+        user_blacklist="",
     )
 
-# ====================== ПРОКСИ МЕДИА ======================
-_HOP_BY_HEADERS = frozenset({
-    'content-encoding',
-    'transfer-encoding',
-    'connection',
-    'keep-alive',
-    'proxy-authenticate',
-    'proxy-authorization',
-    'te',
-    'trailers',
-    'upgrade',
-})
+
+_HOP_BY_HEADERS = frozenset(
+    {
+        "content-encoding",
+        "transfer-encoding",
+        "connection",
+        "keep-alive",
+        "proxy-authenticate",
+        "proxy-authorization",
+        "te",
+        "trailers",
+        "upgrade",
+    }
+)
 
 
 def _validate_proxy_url(url: str | None) -> str | None:
-    if not url or not url.startswith('http'):
+    if not url or not url.startswith("http"):
         return None
 
     from urllib.parse import urlparse
-    host = (urlparse(url).hostname or '').lower()
-    if not host.endswith('rule34.xxx'):
+
+    host = (urlparse(url).hostname or "").lower()
+    if not host.endswith("rule34.xxx"):
         return None
 
     return url
 
 
 def _proxy_request_headers() -> dict[str, str]:
-    headers = {'User-Agent': HEADERS['User-Agent']}
-    if range_header := request.headers.get('Range'):
-        headers['Range'] = range_header
+    headers = {"User-Agent": HEADERS["User-Agent"]}
+    if range_header := request.headers.get("Range"):
+        headers["Range"] = range_header
     return headers
 
 
@@ -240,22 +264,22 @@ def _filter_proxy_headers(headers) -> dict[str, str]:
     }
 
 
-@gallery_bp.route('/proxy/image')
+@gallery_bp.route("/proxy/image")
 def proxy_image():
-    url = _validate_proxy_url(request.args.get('url'))
+    url = _validate_proxy_url(request.args.get("url"))
     if not url:
         return "Invalid URL", 400
 
     headers = _proxy_request_headers()
     client = httpx.Client(timeout=30.0, follow_redirects=True, trust_env=False)
     try:
-        req = client.build_request('GET', url, headers=headers)
+        req = client.build_request("GET", url, headers=headers)
         resp = client.send(req, stream=True)
         if resp.status_code >= 400:
             resp.close()
             return "Proxy error", 502
         response_headers = _filter_proxy_headers(resp.headers)
-        content_type = resp.headers.get('content-type', 'image/jpeg')
+        content_type = resp.headers.get("content-type", "image/jpeg")
 
         def generate():
             try:
@@ -276,16 +300,18 @@ def proxy_image():
         return "Proxy error", 502
 
 
-@gallery_bp.route('/proxy/video', methods=['GET', 'HEAD'])
+@gallery_bp.route("/proxy/video", methods=["GET", "HEAD"])
 def proxy_video():
-    url = _validate_proxy_url(request.args.get('url'))
+    url = _validate_proxy_url(request.args.get("url"))
     if not url:
         return "Invalid URL", 400
 
     headers = _proxy_request_headers()
-    client = httpx.Client(timeout=httpx.Timeout(120.0), follow_redirects=True, trust_env=False)
+    client = httpx.Client(
+        timeout=httpx.Timeout(120.0), follow_redirects=True, trust_env=False
+    )
     try:
-        method = 'HEAD' if request.method == 'HEAD' else 'GET'
+        method = "HEAD" if request.method == "HEAD" else "GET"
         req = client.build_request(method, url, headers=headers)
         resp = client.send(req, stream=True)
 
@@ -295,9 +321,9 @@ def proxy_video():
 
         response_headers = _filter_proxy_headers(resp.headers)
 
-        if request.method == 'HEAD':
+        if request.method == "HEAD":
             resp.close()
-            return Response('', status=resp.status_code, headers=response_headers)
+            return Response("", status=resp.status_code, headers=response_headers)
 
         def generate():
             try:

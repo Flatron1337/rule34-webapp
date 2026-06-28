@@ -3,13 +3,13 @@ from flask import Flask
 from dotenv import load_dotenv
 from .extensions import cache, db
 
+
 def create_app():
     load_dotenv()
     app = Flask(__name__)
 
-    # --- Конфигурация ---
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-key-change-me")
-    
+
     # Cache: Redis в проде, SimpleCache локально без Redis
     redis_url = os.getenv("CACHE_REDIS_URL")
     if redis_url:
@@ -25,9 +25,13 @@ def create_app():
     # каждом деплое/рестарте, поэтому избранное веб-версии не переживает редеплой.
     # Миграция на Render Disk или Postgres отложена. Мобильное приложение хранит
     # избранное локально на устройстве (sqflite) и этой проблемы не касается.
-    instance_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "../instance")
+    instance_path = os.path.join(
+        os.path.abspath(os.path.dirname(__file__)), "../instance"
+    )
     os.makedirs(instance_path, exist_ok=True)
-    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{os.path.join(instance_path, 'favorites.db')}"
+    app.config["SQLALCHEMY_DATABASE_URI"] = (
+        f"sqlite:///{os.path.join(instance_path, 'favorites.db')}"
+    )
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
     # Инициализация расширений
@@ -35,7 +39,6 @@ def create_app():
     db.init_app(app)
 
     # Модели должны быть импортированы до create_all()
-    from . import models  # noqa: F401
 
     with app.app_context():
         db.create_all()

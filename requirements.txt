@@ -7,3 +7,4 @@ hypercorn>=0.18.0,<1.0
 redis>=8.0.1,<9.0
 flask-caching>=2.4.0,<3.0
 flask-sqlalchemy>=3.1.1,<4.0
+asgiref>=3.11.1

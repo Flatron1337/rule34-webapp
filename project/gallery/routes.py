@@ -264,81 +264,84 @@ def _filter_proxy_headers(headers) -> dict[str, str]:
     }
 
 
+_async_client: httpx.AsyncClient | None = None
+
+
+def _get_async_client() -> httpx.AsyncClient:
+    global _async_client
+    if _async_client is None or _async_client.is_closed:
+        _async_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(30.0, connect=10.0),
+            follow_redirects=True,
+            limits=httpx.Limits(max_keepalive_connections=50, max_connections=100),
+            trust_env=False,
+        )
+    return _async_client
+
+
 @gallery_bp.route("/proxy/image")
-def proxy_image():
+async def proxy_image():
     url = _validate_proxy_url(request.args.get("url"))
     if not url:
         return "Invalid URL", 400
 
     headers = _proxy_request_headers()
-    client = httpx.Client(timeout=30.0, follow_redirects=True, trust_env=False)
+    client = _get_async_client()
     try:
-        req = client.build_request("GET", url, headers=headers)
-        resp = client.send(req, stream=True)
+        resp = await client.get(url, headers=headers)
         if resp.status_code >= 400:
-            resp.close()
             return "Proxy error", 502
         response_headers = _filter_proxy_headers(resp.headers)
         content_type = resp.headers.get("content-type", "image/jpeg")
 
-        def generate():
-            try:
-                for chunk in resp.iter_raw():
-                    yield chunk
-            finally:
-                resp.close()
-                client.close()
-
         return Response(
-            stream_with_context(generate()),
+            resp.content,
+            status=resp.status_code,
             content_type=content_type,
             headers=response_headers,
         )
     except Exception:
-        client.close()
         logger.warning("proxy_image failed", exc_info=True)
         return "Proxy error", 502
 
 
 @gallery_bp.route("/proxy/video", methods=["GET", "HEAD"])
-def proxy_video():
+async def proxy_video():
     url = _validate_proxy_url(request.args.get("url"))
     if not url:
         return "Invalid URL", 400
 
     headers = _proxy_request_headers()
-    client = httpx.Client(
-        timeout=httpx.Timeout(120.0), follow_redirects=True, trust_env=False
-    )
+    client = _get_async_client()
     try:
         method = "HEAD" if request.method == "HEAD" else "GET"
         req = client.build_request(method, url, headers=headers)
-        resp = client.send(req, stream=True)
+        resp = await client.send(req, stream=True)
 
         if resp.status_code >= 400:
-            resp.close()
+            await resp.aclose()
             return "Proxy error", 502
 
         response_headers = _filter_proxy_headers(resp.headers)
 
         if request.method == "HEAD":
-            resp.close()
+            await resp.aclose()
             return Response("", status=resp.status_code, headers=response_headers)
 
-        def generate():
+        async def generate():
             try:
-                for chunk in resp.iter_raw():
+                async for chunk in resp.aiter_raw():
                     yield chunk
+            except Exception:
+                pass
             finally:
-                resp.close()
-                client.close()
+                await resp.aclose()
 
         return Response(
-            stream_with_context(generate()),
+            generate(),
             status=resp.status_code,
             headers=response_headers,
         )
     except Exception:
-        client.close()
         logger.warning("proxy_video failed", exc_info=True)
         return "Proxy error", 502

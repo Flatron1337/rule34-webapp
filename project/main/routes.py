@@ -10,6 +10,13 @@ def index():
     return render_template("index.html", history=search_history)
 
 
+@main_bp.route("/health")
+@main_bp.route("/ping")
+def health_check():
+    """Быстрый эндпоинт для проверки здоровья и keep-alive крон-джоб"""
+    return {"status": "ok", "message": "pong"}, 200
+
+
 @main_bp.route("/random")
 def random_post():
     """Редирект на случайный пост"""

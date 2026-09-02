@@ -323,10 +323,13 @@ async def proxy_video():
             return "Proxy error", 502
 
         response_headers = _filter_proxy_headers(resp.headers)
+        content_type = resp.headers.get("content-type", "video/mp4")
 
         if request.method == "HEAD":
             await resp.aclose()
-            return Response("", status=resp.status_code, headers=response_headers)
+            if "content-length" in resp.headers:
+                response_headers["Content-Length"] = resp.headers["content-length"]
+            return Response("", status=resp.status_code, headers=response_headers, content_type=content_type)
 
         async def generate():
             try:
@@ -341,6 +344,7 @@ async def proxy_video():
             generate(),
             status=resp.status_code,
             headers=response_headers,
+            content_type=content_type,
         )
     except Exception:
         logger.warning("proxy_video failed", exc_info=True)

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 import httpx
@@ -335,8 +336,11 @@ async def proxy_video():
             try:
                 async for chunk in resp.aiter_raw():
                     yield chunk
-            except Exception:
+            except (asyncio.CancelledError, GeneratorExit):
+                # Expected when client aborts playback or disconnects
                 pass
+            except Exception as e:
+                logger.debug("Proxy stream closed: %s", e)
             finally:
                 await resp.aclose()
 
